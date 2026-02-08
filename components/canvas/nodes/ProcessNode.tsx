@@ -1,57 +1,325 @@
 import React, { memo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
-import { BaseNode } from "./BaseNode";
-import { ProcessNode as ProcessNodeType } from "@/lib/schema/node";
+import { ProcessDefinition, InputField, OutputField } from "@/lib/schema/node";
 
-// We wrap the component in memo to prevent unnecessary re-renders
-export const ProcessNode = memo(
-  ({ data, selected }: NodeProps<ProcessNodeType>) => {
-    // Cast data safely knowing Zod validation happens elsewhere
-    const config = data.type === "process" ? data.config : {};
+export const ProcessNode = memo(({ data, selected }: NodeProps) => {
+  const processData = data as unknown as ProcessDefinition;
 
-    return (
-      <BaseNode
-        selected={!!selected}
-        type="PROCESS"
-        label={data.label}
-        footer={
-          <span className="flex items-center gap-1">
-            Status: <span className="text-green-500">Ready</span>
-          </span>
-        }
+  const typeColors: Record<string, string> = {
+    calculation: "#60a5fa",
+    database_workflow: "#4ade80",
+    queue_consumer: "#facc15",
+    job: "#fb923c",
+    orchestrated_workflow: "#a78bfa",
+  };
+
+  const executionLabels: Record<string, string> = {
+    sync: "Sync",
+    async: "Async",
+    scheduled: "⏰",
+    event_driven: "⚡",
+  };
+
+  return (
+    <div
+      style={{
+        background: "var(--panel)",
+        border: selected
+          ? "2px solid var(--primary)"
+          : "1px solid var(--border)",
+        borderRadius: 8,
+        minWidth: 280,
+        boxShadow: selected
+          ? "0 0 0 2px rgba(124, 108, 255, 0.2)"
+          : "0 4px 12px rgba(0, 0, 0, 0.3)",
+      }}
+    >
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "8px 12px",
+          borderBottom: "1px solid var(--border)",
+          background: "var(--floating)",
+          borderRadius: "8px 8px 0 0",
+        }}
       >
-        <div className="relative min-h-[40px] flex flex-col justify-center">
-          {/* Input Handle (Left) */}
-          <div className="absolute -left-3 top-1/2 -translate-y-1/2">
-            <Handle
-              type="target"
-              position={Position.Left}
-              className="!w-3 !h-3 !bg-[var(--muted)] !border-none hover:!bg-[var(--primary)] transition-colors"
-            />
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)] pointer-events-none">
-              IN
-            </span>
-          </div>
-
-          <div className="text-xs px-2 line-clamp-2">
-            {data.description || "No description provided."}
-          </div>
-
-          {/* Output Handle (Right) */}
-          <div className="absolute -right-3 top-1/2 -translate-y-1/2">
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)] pointer-events-none">
-              OUT
-            </span>
-            <Handle
-              type="source"
-              position={Position.Right}
-              className="!w-3 !h-3 !bg-[var(--muted)] !border-none hover:!bg-[var(--primary)] transition-colors"
-            />
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              textTransform: "uppercase",
+              color: typeColors[processData.processType] || "var(--muted)",
+              letterSpacing: "0.05em",
+            }}
+          >
+            {processData.processType.replace("_", " ")}
+          </span>
+          <span style={{ fontSize: 10, color: "var(--muted)" }}>
+            {executionLabels[processData.execution]}
+          </span>
         </div>
-      </BaseNode>
-    );
-  },
-);
+      </div>
+
+      {/* Title */}
+      <div
+        style={{
+          padding: "10px 12px",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "var(--foreground)",
+          }}
+        >
+          {processData.label}
+        </div>
+        {processData.description && (
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+            {processData.description}
+          </div>
+        )}
+      </div>
+
+      {/* Inputs */}
+      {processData.inputs.length > 0 && (
+        <div
+          style={{
+            padding: "8px 12px",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              color: "var(--muted)",
+              marginBottom: 6,
+              textTransform: "uppercase",
+            }}
+          >
+            Inputs
+          </div>
+          {processData.inputs.map((input: InputField, i: number) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 11,
+                marginBottom: 4,
+              }}
+            >
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={`input-${input.name}`}
+                style={{
+                  position: "relative",
+                  left: 0,
+                  top: 0,
+                  transform: "none",
+                  width: 8,
+                  height: 8,
+                  background: "var(--muted)",
+                  border: "none",
+                }}
+              />
+              <span style={{ color: "var(--secondary)" }}>{input.name}</span>
+              <span style={{ color: "var(--muted)", fontSize: 10 }}>
+                : {input.type}
+              </span>
+              {input.required && (
+                <span style={{ color: "#ef4444", fontSize: 10 }}>*</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Steps */}
+      {processData.steps.length > 0 && (
+        <div
+          style={{
+            padding: "8px 12px",
+            borderBottom: "1px solid var(--border)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              color: "var(--muted)",
+              marginBottom: 6,
+              textTransform: "uppercase",
+            }}
+          >
+            Steps ({processData.steps.length})
+          </div>
+          {processData.steps.slice(0, 3).map((step, i) => (
+            <div
+              key={step.id}
+              style={{
+                fontSize: 11,
+                color: "var(--secondary)",
+                padding: "4px 8px",
+                background: "var(--background)",
+                borderRadius: 4,
+                marginBottom: 4,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <span style={{ color: "var(--muted)" }}>{i + 1}.</span>
+              <span
+                style={{
+                  color: "#a78bfa",
+                  textTransform: "uppercase",
+                  fontSize: 9,
+                }}
+              >
+                {step.kind}
+              </span>
+              {step.ref && (
+                <span style={{ fontFamily: "monospace" }}>{step.ref}</span>
+              )}
+            </div>
+          ))}
+          {processData.steps.length > 3 && (
+            <div
+              style={{
+                fontSize: 10,
+                color: "var(--muted)",
+                textAlign: "center",
+              }}
+            >
+              +{processData.steps.length - 3} more
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Outputs */}
+      {(processData.outputs.success.length > 0 ||
+        processData.outputs.error.length > 0) && (
+        <div style={{ padding: "8px 12px" }}>
+          <div
+            style={{
+              fontSize: 10,
+              color: "var(--muted)",
+              marginBottom: 6,
+              textTransform: "uppercase",
+            }}
+          >
+            Outputs
+          </div>
+          {processData.outputs.success.map((output: OutputField, i: number) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: 11,
+                marginBottom: 4,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "#4ade80", fontSize: 9 }}>✓</span>
+                <span style={{ color: "var(--secondary)" }}>{output.name}</span>
+                <span style={{ color: "var(--muted)", fontSize: 10 }}>
+                  : {output.type}
+                </span>
+              </div>
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={`output-${output.name}`}
+                style={{
+                  position: "relative",
+                  right: 0,
+                  top: 0,
+                  transform: "none",
+                  width: 8,
+                  height: 8,
+                  background: "#4ade80",
+                  border: "none",
+                }}
+              />
+            </div>
+          ))}
+          {processData.outputs.error.map((output: OutputField, i: number) => (
+            <div
+              key={`err-${i}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: 11,
+                marginBottom: 4,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "#ef4444", fontSize: 9 }}>✗</span>
+                <span style={{ color: "var(--secondary)" }}>{output.name}</span>
+                <span style={{ color: "var(--muted)", fontSize: 10 }}>
+                  : {output.type}
+                </span>
+              </div>
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={`error-${output.name}`}
+                style={{
+                  position: "relative",
+                  right: 0,
+                  top: 0,
+                  transform: "none",
+                  width: 8,
+                  height: 8,
+                  background: "#ef4444",
+                  border: "none",
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Default handles if no inputs/outputs */}
+      {processData.inputs.length === 0 && (
+        <Handle
+          type="target"
+          position={Position.Left}
+          style={{
+            width: 10,
+            height: 10,
+            background: "var(--muted)",
+            border: "2px solid var(--panel)",
+          }}
+        />
+      )}
+      {processData.outputs.success.length === 0 &&
+        processData.outputs.error.length === 0 && (
+          <Handle
+            type="source"
+            position={Position.Right}
+            style={{
+              width: 10,
+              height: 10,
+              background: "var(--primary)",
+              border: "2px solid var(--panel)",
+            }}
+          />
+        )}
+    </div>
+  );
+});
 
 ProcessNode.displayName = "ProcessNode";

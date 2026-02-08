@@ -3,43 +3,233 @@
 import React from "react";
 import dynamic from "next/dynamic";
 import { PropertyInspector } from "@/components/panels/PropertyInspector";
+import { useStore } from "@/store/useStore";
 
-// Dynamic import for React Flow to avoid SSR issues
 const FlowCanvas = dynamic(() => import("@/components/canvas/FlowCanvas"), {
   ssr: false,
 });
 
 export default function Home() {
+  const addNode = useStore((state) => state.addNode);
+
+  const sidebarItemStyle: React.CSSProperties = {
+    cursor: "pointer",
+    padding: "8px 12px",
+    borderRadius: 4,
+    transition: "all 0.15s ease",
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+  };
+
   return (
-    <div className="flex h-screen w-screen flex-col bg-[var(--background)] text-[var(--foreground)] overflow-hidden">
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        width: "100vw",
+        background: "var(--background)",
+        color: "var(--foreground)",
+        overflow: "hidden",
+      }}
+    >
       {/* Top Bar */}
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--panel)] bg-[var(--panel)] px-4">
-        <div className="font-bold text-sm tracking-wide">ERMIZ</div>
-        <div className="text-xs text-[var(--muted)]">Project: Untitled</div>
+      <header
+        style={{
+          display: "flex",
+          height: 48,
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: "1px solid var(--border)",
+          background: "var(--panel)",
+          padding: "0 16px",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: "0.05em" }}>
+          ERMIZ
+        </div>
+        <div style={{ fontSize: 12, color: "var(--muted)" }}>
+          Visual Backend Designer
+        </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Left Rail */}
-        <aside className="w-64 shrink-0 border-r border-[var(--panel)] bg-[var(--panel)] p-4 flex flex-col gap-4">
-          <div className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
-            Navigation
-          </div>
-          {/* Placeholder for API/Process list */}
-          <div className="flex flex-col gap-2 text-sm text-[var(--secondary)]">
-            <div className="hover:text-[var(--foreground)] cursor-pointer">
-              APIs
-            </div>
-            <div className="hover:text-[var(--foreground)] cursor-pointer">
+        <aside
+          style={{
+            width: 220,
+            flexShrink: 0,
+            borderRight: "1px solid var(--border)",
+            background: "var(--panel)",
+            padding: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            overflowY: "auto",
+          }}
+        >
+          {/* Processes */}
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                marginBottom: 8,
+              }}
+            >
               Processes
             </div>
-            <div className="hover:text-[var(--foreground)] cursor-pointer">
-              Databases
+            <div
+              style={{ ...sidebarItemStyle, color: "var(--secondary)" }}
+              onClick={() => addNode("process")}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = "var(--floating)";
+                e.currentTarget.style.color = "#a78bfa";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--secondary)";
+              }}
+            >
+              <span style={{ fontSize: 14 }}>⚙️</span>
+              <span style={{ fontSize: 13 }}>New Process</span>
+            </div>
+          </div>
+
+          {/* Infrastructure */}
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                marginBottom: 8,
+              }}
+            >
+              Infrastructure
+            </div>
+            <div
+              style={{ ...sidebarItemStyle, color: "var(--secondary)" }}
+              onClick={() => addNode("database")}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = "var(--floating)";
+                e.currentTarget.style.color = "#4ade80";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--secondary)";
+              }}
+            >
+              <span style={{ fontSize: 14 }}>🗄️</span>
+              <span style={{ fontSize: 13 }}>Database</span>
+            </div>
+            <div
+              style={{ ...sidebarItemStyle, color: "var(--secondary)" }}
+              onClick={() => addNode("queue")}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = "var(--floating)";
+                e.currentTarget.style.color = "#facc15";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--secondary)";
+              }}
+            >
+              <span style={{ fontSize: 14 }}>📬</span>
+              <span style={{ fontSize: 13 }}>Queue</span>
+            </div>
+          </div>
+
+          {/* Bindings */}
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                marginBottom: 8,
+              }}
+            >
+              API Endpoints
+            </div>
+            {[
+              { kind: "api_get", label: "GET", color: "#4ade80", icon: "🟢" },
+              { kind: "api_post", label: "POST", color: "#facc15", icon: "🟡" },
+              { kind: "api_put", label: "PUT", color: "#60a5fa", icon: "🔵" },
+              {
+                kind: "api_delete",
+                label: "DELETE",
+                color: "#ef4444",
+                icon: "🔴",
+              },
+              {
+                kind: "api_patch",
+                label: "PATCH",
+                color: "#a78bfa",
+                icon: "🟣",
+              },
+            ].map((api) => (
+              <div
+                key={api.kind}
+                style={{ ...sidebarItemStyle, color: "var(--secondary)" }}
+                onClick={() =>
+                  addNode(api.kind as Parameters<typeof addNode>[0])
+                }
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = "var(--floating)";
+                  e.currentTarget.style.color = api.color;
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "var(--secondary)";
+                }}
+              >
+                <span style={{ fontSize: 12 }}>{api.icon}</span>
+                <span style={{ fontSize: 12, fontFamily: "monospace" }}>
+                  {api.label}
+                </span>
+              </div>
+            ))}
+            <div
+              style={{
+                ...sidebarItemStyle,
+                color: "var(--muted)",
+                marginTop: 4,
+                fontSize: 11,
+              }}
+              onClick={() => addNode("api_binding")}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = "var(--floating)";
+                e.currentTarget.style.color = "var(--secondary)";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--muted)";
+              }}
+            >
+              <span style={{ fontSize: 12 }}>🔗</span>
+              <span style={{ fontSize: 11 }}>Custom API</span>
             </div>
           </div>
         </aside>
 
         {/* Canvas Area */}
-        <main className="flex-1 relative bg-[var(--background)]">
+        <main
+          style={{
+            flex: 1,
+            position: "relative",
+            background: "var(--background)",
+          }}
+        >
           <FlowCanvas />
         </main>
 
@@ -47,8 +237,20 @@ export default function Home() {
         <PropertyInspector />
       </div>
 
-      {/* Bottom Status Bar (optional) */}
-      <footer className="h-6 shrink-0 bg-[var(--panel)] border-t border-[var(--panel)] flex items-center px-4 text-[10px] text-[var(--muted)]">
+      {/* Bottom Status Bar */}
+      <footer
+        style={{
+          height: 24,
+          flexShrink: 0,
+          background: "var(--panel)",
+          borderTop: "1px solid var(--border)",
+          display: "flex",
+          alignItems: "center",
+          padding: "0 16px",
+          fontSize: 11,
+          color: "var(--muted)",
+        }}
+      >
         Ready
       </footer>
     </div>

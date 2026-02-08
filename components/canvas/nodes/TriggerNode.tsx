@@ -10,44 +10,65 @@ export const TriggerNode = memo(
     const method = config.method || "GET";
     const route = config.route || "/";
 
+    const methodColor =
+      method === "GET" ? "#60a5fa" : method === "POST" ? "#4ade80" : "#fb923c";
+
     return (
       <BaseNode
         selected={!!selected}
         type="TRIGGER"
         label={data.label}
-        className={isTrigger ? "border-l-4 border-l-[var(--primary)]" : ""}
+        className={isTrigger ? "trigger-accent" : ""}
       >
-        <div className="relative min-h-[40px] flex flex-col justify-center gap-1">
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--floating)] ${
-                method === "GET"
-                  ? "text-blue-400"
-                  : method === "POST"
-                    ? "text-green-400"
-                    : method === "DELETE"
-                      ? "text-red-400"
-                      : "text-yellow-400"
-              }`}
+        <div className="relative" style={{ minHeight: 40 }}>
+          {isTrigger && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "var(--floating)",
+                padding: "6px 8px",
+                borderRadius: 4,
+                fontSize: 12,
+                marginBottom: 8,
+              }}
             >
-              {method}
-            </span>
-            <span className="text-xs font-mono text-[var(--foreground)] truncate">
-              {route}
-            </span>
+              <span
+                style={{
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  color: methodColor,
+                }}
+              >
+                {method}
+              </span>
+              <span
+                style={{ fontFamily: "monospace", color: "var(--foreground)" }}
+              >
+                {route}
+              </span>
+            </div>
+          )}
+
+          <div
+            style={{ fontSize: 10, color: "var(--muted)", padding: "0 4px" }}
+          >
+            {data.description || "API Entry Point"}
           </div>
 
-          {/* Output Handle (Right Only) */}
-          <div className="absolute -right-3 top-1/2 -translate-y-1/2">
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)] pointer-events-none">
-              REQ
-            </span>
-            <Handle
-              type="source"
-              position={Position.Right}
-              className="!w-3 !h-3 !bg-[var(--primary)] !border-none hover:scale-125 transition-transform"
-            />
-          </div>
+          {/* Output Handle (Right) Only */}
+          <Handle
+            type="source"
+            position={Position.Right}
+            style={{
+              width: 12,
+              height: 12,
+              background: "var(--primary)",
+              border: "2px solid var(--panel)",
+              right: -6,
+            }}
+          />
         </div>
       </BaseNode>
     );

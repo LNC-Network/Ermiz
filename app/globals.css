@@ -1,29 +1,297 @@
 @import "tailwindcss";
 
+/* ============================================
+   ERMIZ Design System - Based on design-doc.md
+   ============================================ */
+
+/* Design Tokens */
 :root {
+  /* Background Layers */
   --background: #0b0b0d;
-  --foreground: #e6e6eb;
   --panel: #111114;
   --floating: #15151a;
-  --primary: #7c6cff; /* or #ff4d4d */
+
+  /* Text Colors */
+  --foreground: #e6e6eb;
   --secondary: #a1a1aa;
   --muted: #6b6b75;
+
+  /* Accent */
+  --primary: #7c6cff;
   --destructive: #ff4d4d;
+
+  /* Borders */
+  --border: #1e1e24;
+  --border-muted: #2a2a32;
 }
 
+/* Tailwind v4 Theme Extension */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-panel: var(--panel);
-  --color-floating: var(--floating);
-  --color-primary: var(--primary);
-  --color-secondary: var(--secondary);
-  --color-muted: var(--muted);
-  --color-destructive: var(--destructive);
+  --color-background: #0b0b0d;
+  --color-foreground: #e6e6eb;
+  --color-panel: #111114;
+  --color-floating: #15151a;
+  --color-primary: #7c6cff;
+  --color-secondary: #a1a1aa;
+  --color-muted: #6b6b75;
+  --color-destructive: #ff4d4d;
+  --color-border: #1e1e24;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
+
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* ============================================
+   React Flow Theme Overrides
+   ============================================ */
+
+.react-flow {
+  --xy-background-color: var(--background);
+  --xy-node-background-color: var(--panel);
+  --xy-node-border-color: var(--border);
+  --xy-edge-stroke: var(--muted);
+  --xy-edge-stroke-selected: var(--primary);
+  --xy-handle-background-color: var(--muted);
+  --xy-handle-border-color: var(--panel);
+  --xy-selection-background-color: rgba(124, 108, 255, 0.15);
+  --xy-controls-button-background-color: var(--floating);
+  --xy-controls-button-background-color-hover: var(--panel);
+  --xy-minimap-background-color: var(--floating);
+  --xy-minimap-mask-background-color: rgba(11, 11, 13, 0.6);
+}
+
+/* Controls Panel */
+.react-flow__controls {
+  background: var(--floating);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.react-flow__controls button {
+  background: var(--floating);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+}
+
+.react-flow__controls button:last-child {
+  border-bottom: none;
+}
+
+.react-flow__controls button:hover {
+  background: var(--panel);
+}
+
+.react-flow__controls button svg {
+  fill: var(--foreground);
+  max-width: 14px;
+  max-height: 14px;
+}
+
+/* MiniMap */
+.react-flow__minimap {
+  background: var(--floating);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Attribution */
+.react-flow__attribution {
+  background: var(--floating);
+  padding: 2px 6px;
+  border-radius: 4px 0 0 0;
+}
+
+.react-flow__attribution a {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+/* Edges */
+.react-flow__edge-path {
+  stroke: var(--muted);
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:focus .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: var(--primary);
+  stroke-width: 2.5;
+}
+
+/* Connection Line */
+.react-flow__connection-line {
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+
+/* Handles */
+.react-flow__handle {
+  width: 12px;
+  height: 12px;
+  background: var(--muted);
+  border: 2px solid var(--panel);
+  border-radius: 50%;
+}
+
+.react-flow__handle:hover {
+  background: var(--primary);
+}
+
+.react-flow__handle.connecting {
+  background: var(--primary);
+}
+
+.react-flow__handle.valid {
+  background: #22c55e;
+}
+
+/* Background Grid */
+.react-flow__background pattern circle {
+  fill: var(--border);
+}
+
+/* ============================================
+   Scrollbar Styling
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-muted) var(--background);
+}
+
+/* ============================================
+   Focus & Selection States
+   ============================================ */
+
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgba(124, 108, 255, 0.35);
+  color: var(--foreground);
+}
+
+/* ============================================
+   Custom Node Styles (Override for reliability)
+   ============================================ */
+
+.ermiz-node {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.15s ease;
+}
+
+.ermiz-node:hover {
+  border-color: var(--muted);
+}
+
+.ermiz-node.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary), 0 4px 12px rgba(124, 108, 255, 0.2);
+}
+
+.ermiz-node-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ermiz-node-type {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary);
+}
+
+.ermiz-node-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ermiz-node-body {
+  padding: 12px;
+  font-size: 12px;
+  color: var(--secondary);
+  min-height: 40px;
+  position: relative;
+}
+
+.ermiz-node-footer {
+  padding: 6px 12px;
+  font-size: 10px;
+  color: var(--muted);
+  background: rgba(21, 21, 26, 0.5);
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 7px 7px;
+}
+
+/* ============================================
+   Panel Styles (Fallback)
+   ============================================ */
+
+.ermiz-panel {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+.ermiz-floating {
+  background: var(--floating);
+}
+
+/* Trigger Node Special Styling */
+.ermiz-node.trigger-accent {
+  border-left: 4px solid var(--primary);
 }
