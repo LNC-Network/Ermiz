@@ -1,2 +1,261 @@
 # Ermiz
-Design backend logic visually and let AI take control of it.
+
+A visual, spec-correct backend design tool that lets developers **design APIs, processes, and infrastructure explicitly**, using industry standards and plain JSON — without losing control to AI or abstractions.
+
+---
+
+## What This Is
+
+This project is a **visual backend design platform** inspired by node-based systems (like n8n), but built for **real backend engineering**, not low-code demos.
+
+You design:
+
+* **External APIs** (REST, Events, WebSockets)
+* **Internal processes** (functions, workflows, jobs)
+* **Infrastructure** (databases, queues)
+
+All of this is expressed as:
+
+* **Industry-standard specifications** (OpenAPI / AsyncAPI)
+* **Plain, structured JSON** for everything else
+
+There is no hidden logic.
+There is no magic.
+What you see is what gets built.
+
+---
+
+## What It Does
+
+### 1. Designs APIs Correctly
+
+* REST APIs → OpenAPI
+* Event / WebSocket APIs → AsyncAPI
+
+Each API:
+
+* Is created by choosing its **type first**
+* Generates **one canonical spec file**
+* Contains **no business logic**
+
+APIs describe **how your system is called**, not how it works.
+
+---
+
+### 2. Designs Internal Processes Explicitly
+
+Processes are first-class citizens.
+
+You can design:
+
+* Calculations
+* Database workflows
+* Background jobs
+* Queue consumers
+* Scheduled tasks
+
+Each process explicitly declares:
+
+* Name
+* Type
+* Execution model (sync / async / scheduled / event-driven)
+* Inputs (typed)
+* Outputs (typed, including errors)
+* Step-by-step execution graph
+
+Processes are expressed in **plain JSON**, not code.
+
+---
+
+### 3. Models Infrastructure as Capabilities
+
+Databases, queues, and similar systems are **not helpers** — they are **capability boundaries**.
+
+Infrastructure blocks declare:
+
+* What they are (SQL, NoSQL, queue, etc.)
+* What they support (transactions, retries, joins, etc.)
+* Where and how they can be used
+
+Nothing is assumed.
+Nothing is implicit.
+
+---
+
+### 4. Keeps a Single Source of Truth (Per Concern)
+
+There is no “visual-only” state.
+
+| Concern            | Source of Truth |
+| ------------------ | --------------- |
+| REST APIs          | OpenAPI         |
+| Event / WS APIs    | AsyncAPI        |
+| Processes          | Plain JSON      |
+| Databases / Queues | Plain JSON      |
+| Schemas            | Shared registry |
+
+The visual editor is a **projection**, not the truth.
+
+---
+
+### 5. Uses AI Safely (Optional)
+
+AI is an **extension**, not the foundation.
+
+AI can:
+
+* Generate process graphs from descriptions
+* Suggest missing fields or validations
+* Generate backend code from specs + JSON
+
+AI cannot:
+
+* Invent architecture
+* Modify definitions silently
+* Bypass declared inputs/outputs
+* Replace specs with “best guesses”
+
+You stay in control.
+
+---
+
+## How It Works (High Level)
+
+### Step 1: Choose What You’re Designing
+
+* API (REST / Event)
+* Process
+* Infrastructure
+
+This choice **locks the rules**.
+
+---
+
+### Step 2: Use a Spec-Aware Canvas
+
+* Nodes available depend on what you’re designing
+* Invalid connections are impossible
+* Everything you place maps deterministically to source files
+
+The editor enforces correctness **by construction**.
+
+---
+
+### Step 3: Generate Canonical Outputs
+
+* APIs → OpenAPI / AsyncAPI
+* Processes → JSON
+* Infrastructure → JSON
+
+All outputs are:
+
+* Deterministic
+* Versionable
+* Machine-readable
+* Human-auditable
+
+---
+
+### Step 4: (Optional) Compile With AI
+
+AI consumes the generated files and produces:
+
+* Backend code
+* Infrastructure bindings
+* Client SDKs
+
+The specs and JSON remain the authority.
+
+---
+
+## Design Principles
+
+* **Structure over decoration**
+* **Editing is cheaper than rebuilding**
+* **No implicit behavior**
+* **No proprietary formats**
+* **No universal-spec fantasies**
+
+> Universality lives in the editor, not the document.
+
+---
+
+## What This Is NOT
+
+* ❌ A low-code platform
+* ❌ A diagramming tool
+* ❌ A visual scripting language
+* ❌ An OpenAPI replacement
+* ❌ An AI-first system
+
+If it hides structure, it’s out of scope.
+
+---
+
+## Mental Model
+
+> **Figma for backend systems**
+>
+> * APIs = contracts
+> * Processes = execution
+> * Infrastructure = capabilities
+> * AI = compiler
+
+---
+
+## Who This Is For
+
+* Backend engineers who want **clarity before code**
+* Teams that care about **long-term maintainability**
+* Developers who like AI but **don’t trust it blindly**
+* Anyone tired of undocumented backend behavior
+
+---
+
+## Why This Exists
+
+Most backend tools fail in one of two ways:
+
+1. Too abstract → not real
+2. Too manual → too slow
+
+This tool sits in between:
+
+* Explicit enough to be correct
+* Visual enough to be fast
+* Structured enough for AI
+* Honest enough for engineers
+
+---
+
+## Status
+
+Early-stage, design-driven.
+APIs and schemas are expected to evolve.
+
+Breaking changes are acceptable **until v1**.
+
+---
+
+## Future Scope (Not Promises)
+
+* GraphQL support
+* RPC / Protobuf
+* Multi-service projects
+* Policy and auth modeling
+* Infra export (Terraform, etc.)
+
+Only when they fit the model.
+
+---
+
+## Final Note
+
+If this ever becomes:
+
+* Harder to change than to rebuild
+* Less explicit than code
+* More magical than honest
+
+Then it has failed.
+
