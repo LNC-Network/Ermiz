@@ -29,10 +29,15 @@ export const ApiBindingNode = memo(({ data, selected }: NodeProps) => {
     <div
       style={{
         background: "var(--panel)",
-        border: selected
-          ? "2px solid var(--primary)"
-          : "1px solid var(--border)",
-        borderLeft: `4px solid ${methodColors[apiData.method] || "var(--primary)"}`,
+        borderStyle: "solid",
+        borderTopWidth: selected ? 2 : 1,
+        borderRightWidth: selected ? 2 : 1,
+        borderBottomWidth: selected ? 2 : 1,
+        borderLeftWidth: 4,
+        borderTopColor: selected ? "var(--primary)" : "var(--border)",
+        borderRightColor: selected ? "var(--primary)" : "var(--border)",
+        borderBottomColor: selected ? "var(--primary)" : "var(--border)",
+        borderLeftColor: methodColors[apiData.method] || "var(--primary)",
         borderRadius: 8,
         minWidth: 280,
         boxShadow: selected

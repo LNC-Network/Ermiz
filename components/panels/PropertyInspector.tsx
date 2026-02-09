@@ -43,7 +43,7 @@ const sectionStyle: React.CSSProperties = {
   marginTop: 8,
 };
 
-export function PropertyInspector() {
+export function PropertyInspector({ width = 320 }: { width?: number }) {
   const {
     nodes,
     updateNodeData,
@@ -77,7 +77,7 @@ export function PropertyInspector() {
   const selectedNode = nodes.find((n) => n.selected);
 
   const panelStyle: React.CSSProperties = {
-    width: 320,
+    width,
     flexShrink: 0,
     borderLeft: "1px solid var(--border)",
     background: "var(--panel)",

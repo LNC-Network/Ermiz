@@ -13,6 +13,7 @@ import {
   useReactFlow,
   ReactFlowProvider,
 } from "@xyflow/react";
+import { Hand, MousePointer2 } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 import { useStore } from "@/store/useStore";
 import { ProcessNode } from "./nodes/ProcessNode";
@@ -49,6 +50,10 @@ function FlowCanvasInner() {
     useStore();
   const { screenToFlowPosition } = useReactFlow();
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [interactionMode, setInteractionMode] = useState<"select" | "pan">(
+    "select",
+  );
+  const [showMiniMap, setShowMiniMap] = useState(false);
 
   const handleContextMenu = useCallback(
     (event: React.MouseEvent) => {
@@ -74,7 +79,163 @@ function FlowCanvasInner() {
   );
 
   return (
-    <div className="h-full w-full" onContextMenu={handleContextMenu}>
+    <div
+      className="h-full w-full"
+      onContextMenu={handleContextMenu}
+      style={{ position: "relative" }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 12,
+          left: 12,
+          zIndex: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: 4,
+          borderRadius: 10,
+          border: "1px solid var(--border)",
+          background: "var(--floating)",
+          boxShadow: "var(--shadow-soft)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setInteractionMode("select")}
+          title="Select blocks"
+          aria-label="Select mode"
+          style={{
+            border: "none",
+            borderRadius: 8,
+            width: 32,
+            height: 32,
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 0,
+            cursor: "pointer",
+            background:
+              interactionMode === "select" ? "var(--panel)" : "transparent",
+            color:
+              interactionMode === "select" ? "var(--foreground)" : "var(--muted)",
+          }}
+        >
+          <MousePointer2 size={15} style={{ display: "block" }} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setInteractionMode("pan")}
+          title="Pan canvas"
+          aria-label="Pan mode"
+          style={{
+            border: "none",
+            borderRadius: 8,
+            width: 32,
+            height: 32,
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 0,
+            cursor: "pointer",
+            background:
+              interactionMode === "pan" ? "var(--panel)" : "transparent",
+            color:
+              interactionMode === "pan" ? "var(--foreground)" : "var(--muted)",
+          }}
+        >
+          <Hand size={15} style={{ display: "block" }} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowMiniMap((prev) => !prev)}
+          title={showMiniMap ? "Hide minimap" : "Show minimap"}
+          aria-label={showMiniMap ? "Hide minimap" : "Show minimap"}
+          style={{
+            border: "none",
+            borderRadius: 8,
+            width: 32,
+            height: 32,
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 0,
+            cursor: "pointer",
+            background: showMiniMap ? "var(--panel)" : "transparent",
+            color: showMiniMap ? "var(--foreground)" : "var(--muted)",
+          }}
+        >
+          {showMiniMap ? (
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ display: "block" }}
+              aria-hidden="true"
+            >
+              <rect
+                x="2"
+                y="3"
+                width="12"
+                height="10"
+                rx="1.5"
+                stroke="currentColor"
+                strokeWidth="1.3"
+              />
+              <rect
+                x="5.4"
+                y="5.4"
+                width="4.2"
+                height="3.6"
+                rx="0.8"
+                stroke="currentColor"
+                strokeWidth="1.1"
+              />
+            </svg>
+          ) : (
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ display: "block" }}
+              aria-hidden="true"
+            >
+              <rect
+                x="2"
+                y="3"
+                width="12"
+                height="10"
+                rx="1.5"
+                stroke="currentColor"
+                strokeWidth="1.3"
+              />
+              <rect
+                x="5.4"
+                y="5.4"
+                width="4.2"
+                height="3.6"
+                rx="0.8"
+                stroke="currentColor"
+                strokeWidth="1.1"
+              />
+              <path
+                d="M3 13L13.5 3"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+        </button>
+      </div>
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -90,6 +251,8 @@ function FlowCanvasInner() {
         snapGrid={[20, 20]}
         deleteKeyCode={["Backspace", "Delete"]}
         selectionKeyCode={["Shift"]}
+        selectionOnDrag={interactionMode === "select"}
+        panOnDrag={interactionMode === "pan"}
         onPaneClick={() => setContextMenu(null)}
       >
         <Background
@@ -103,18 +266,20 @@ function FlowCanvasInner() {
             borderColor: "var(--border)",
           }}
         />
-        <MiniMap
-          style={{
-            background: "var(--floating)",
-            borderColor: "var(--border)",
-          }}
-          nodeColor={(node) => {
-            if (node.data?.kind === "database") return "#336791";
-            if (node.data?.kind === "queue") return "#facc15";
-            if (node.data?.kind === "api_binding") return "#a78bfa";
-            return "#7c6cff";
-          }}
-        />
+        {showMiniMap && (
+          <MiniMap
+            style={{
+              background: "var(--floating)",
+              borderColor: "var(--border)",
+            }}
+            nodeColor={(node) => {
+              if (node.data?.kind === "database") return "#336791";
+              if (node.data?.kind === "queue") return "#facc15";
+              if (node.data?.kind === "api_binding") return "#a78bfa";
+              return "#7c6cff";
+            }}
+          />
+        )}
       </ReactFlow>
 
       {contextMenu && (

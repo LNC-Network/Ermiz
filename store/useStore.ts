@@ -31,6 +31,8 @@ type NodeKind =
   | "api_delete"
   | "api_patch";
 
+type GraphPreset = "empty" | "hello_world_api";
+
 type RFState = {
   nodes: Node[];
   edges: Edge[];
@@ -62,73 +64,82 @@ type RFState = {
   addStep: (nodeId: string, step: ProcessStep) => void;
   removeStep: (nodeId: string, stepId: string) => void;
   setGraph: (graph: ProcessGraph) => void;
+  loadGraphPreset: (preset: GraphPreset) => void;
 };
 
-// Default nodes with new schema
-const defaultNodes: Node[] = [
-  {
-    id: "1",
-    type: "process",
-    position: { x: 100, y: 100 },
-    data: {
-      kind: "process",
-      id: "createUser",
-      label: "Create User",
-      processType: "database_workflow",
-      execution: "sync",
-      description: "Creates a new user and returns the created record",
-      inputs: [
-        { name: "email", type: "string", required: true },
-        { name: "password", type: "string", required: true },
-      ],
-      outputs: {
-        success: [
-          { name: "userId", type: "string" },
-          { name: "email", type: "string" },
-        ],
-        error: [
-          { name: "code", type: "string" },
-          { name: "message", type: "string" },
-        ],
-      },
-      steps: [
-        { id: "step1", kind: "ref", ref: "hashPassword" },
-        {
-          id: "step2",
-          kind: "db_operation",
-          config: { operation: "insert", table: "User" },
+const graphPresets: Record<GraphPreset, { nodes: Node[]; edges: Edge[] }> = {
+  empty: {
+    nodes: [],
+    edges: [],
+  },
+  hello_world_api: {
+    nodes: [
+      {
+        id: "hello-api",
+        type: "api_binding",
+        position: { x: 120, y: 120 },
+        data: {
+          kind: "api_binding",
+          id: "helloWorldApi",
+          label: "Hello World API",
+          apiType: "openapi",
+          method: "GET",
+          route: "/api/hello",
+          request: {
+            pathParams: [],
+            queryParams: [],
+            headers: [],
+            body: { contentType: "application/json", schema: [] },
+          },
+          responses: {
+            success: {
+              statusCode: 200,
+              schema: [{ name: "message", type: "string" }],
+            },
+            error: { statusCode: 500, schema: [] },
+          },
+          security: { type: "none", scopes: [] },
+          rateLimit: { enabled: false, requests: 100, window: "minute" },
+          version: "v1",
+          deprecated: false,
+          processRef: "helloWorldProcess",
+          description: "Returns a hello world message",
         },
-      ],
-    },
-  },
-  {
-    id: "2",
-    type: "database",
-    position: { x: 500, y: 100 },
-    data: {
-      kind: "database",
-      id: "primaryPostgres",
-      label: "Primary Database",
-      dbType: "sql",
-      engine: "postgres",
-      capabilities: {
-        crud: true,
-        transactions: true,
-        joins: true,
-        aggregations: true,
-        indexes: true,
-        constraints: true,
-        pagination: true,
       },
-      schemas: ["User", "Order"],
-      description: "Main PostgreSQL database",
-    },
+      {
+        id: "hello-process",
+        type: "process",
+        position: { x: 460, y: 120 },
+        data: {
+          kind: "process",
+          id: "helloWorldProcess",
+          label: "Hello World Process",
+          processType: "calculation",
+          execution: "sync",
+          description: "Produces a simple hello-world response",
+          inputs: [],
+          outputs: {
+            success: [{ name: "message", type: "string" }],
+            error: [{ name: "message", type: "string" }],
+          },
+          steps: [{ id: "step1", kind: "ref", ref: "returnHelloWorld" }],
+        },
+      },
+    ],
+    edges: [
+      {
+        id: "hello-edge-api-process",
+        source: "hello-api",
+        target: "hello-process",
+        type: "step",
+      },
+    ],
   },
-];
+};
 
 export const useStore = create<RFState>((set, get) => ({
-  nodes: defaultNodes,
-  edges: [{ id: "e1-2", source: "1", target: "2", type: "step" }],
+  nodes: graphPresets.hello_world_api.nodes,
+  edges: graphPresets.hello_world_api.edges,
 
   onNodesChange: (changes: NodeChange[]) => {
     set({ nodes: applyNodeChanges(changes, get().nodes) });
@@ -594,6 +605,17 @@ export const useStore = create<RFState>((set, get) => ({
     set({
       nodes: graph.nodes as unknown as Node[],
       edges: graph.edges as unknown as Edge[],
+    });
+  },
+
+  loadGraphPreset: (preset: GraphPreset) => {
+    const selectedPreset = graphPresets[preset];
+    set({
+      nodes: selectedPreset.nodes.map((node) => ({
+        ...node,
+        data: { ...(node.data as object) },
+      })) as Node[],
+      edges: selectedPreset.edges.map((edge) => ({ ...edge })),
     });
   },
 }));
