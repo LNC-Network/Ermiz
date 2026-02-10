@@ -4,6 +4,35 @@ A visual, spec-correct backend design tool that lets developers **design APIs, p
 
 ---
 
+## Backend (Prisma + Postgres)
+
+### Setup
+- Copy `.env.example` to `.env` and set `DATABASE_URL` to your Postgres instance. Defaults assume schema `public`.
+- Install dependencies and generate the Prisma client: `npm install && npm run prisma:generate`.
+- Create/migrate the database: `npm run prisma:migrate -- --name init`.
+
+### Data model (high level)
+- Users with per-user credit balance and ledger (monthly free grant + dummy payments).
+- Documents stored per tab (`tab` enum) with JSONB `content` and optional `metadata`; `DocumentSet` groups multiple documents for a tab.
+
+### API routes (app router)
+- `GET /api/credits` — returns refreshed credit balance (applies monthly free grant based on `FREE_RESET_DAY_OF_MONTH`).
+- `POST /api/credits/use` — consume credits; rejects if over balance.
+- `POST /api/payments/dummy` — adds credits via dummy payment.
+- `GET/POST /api/documents` — list or create JSON documents per tab (charges 1 credit on create).
+- `GET/PATCH/DELETE /api/documents/:id` — read/update/delete a document (update charges 1 credit).
+- `GET/POST /api/document-sets` — manage document collections per tab.
+
+Auth uses Supabase with Google OAuth. All protected routes are enforced by `middleware.ts`; if the Supabase session cookie is missing/expired, the user is redirected to `/login`.
+
+### Authentication (Supabase)
+- Configure Supabase project and enable Google OAuth. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in `.env`.
+- Redirect URL in Supabase should include `http://localhost:3000/auth/callback` for local dev.
+- Login page at `/login` triggers `signInWithOAuth` (Google). The OAuth code is exchanged at `/auth/callback`, setting httpOnly Supabase auth cookies.
+- Middleware refreshes access tokens using the Supabase refresh token; if refresh fails, the user is sent back to `/login`.
+
+---
+
 ## What This Is
 
 This project is a **visual backend design platform** inspired by node-based systems (like n8n), but built for **real backend engineering**, not low-code demos.

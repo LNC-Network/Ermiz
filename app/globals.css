@@ -267,6 +267,10 @@ textarea::placeholder {
   outline-offset: 2px;
 }
 
+.no-focus-ring:focus-visible {
+  outline: none;
+}
+
 ::selection {
   background: rgba(124, 108, 255, 0.35);
   color: var(--foreground);
