@@ -259,6 +259,8 @@ export const DatabaseOrmTargetSchema = z.enum([
 
 export const DatabaseFieldTypeSchema = z.enum([
   "string",
+  "number",
+  "date",
   "text",
   "int",
   "bigint",

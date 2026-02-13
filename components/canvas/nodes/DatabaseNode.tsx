@@ -1,10 +1,25 @@
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { DatabaseBlock } from "@/lib/schema/node";
 import { estimateDatabaseMonthlyCost } from "@/lib/cost-estimator";
+import { analyzeDBConnections } from "@/lib/schema/graph";
+import { useStore } from "@/store/useStore";
 
-export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
+export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
   const dbData = data as unknown as DatabaseBlock;
+  const nodes = useStore((state) => state.nodes);
+  const edges = useStore((state) => state.edges);
+  const dbConnectionSummary = useMemo(() => {
+    const analysis = analyzeDBConnections({
+      nodes: nodes as Array<{
+        id: string;
+        type?: string;
+        data?: Record<string, unknown>;
+      }>,
+      edges: edges as Array<{ source: string; target: string }>,
+    });
+    return analysis[id] || null;
+  }, [edges, id, nodes]);
 
   const engineColors: Record<string, string> = {
     postgres: "#336791",
@@ -314,8 +329,32 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
           color: "var(--muted)",
         }}
       >
-        <span>Tables: {dbData.tables?.length || 0}</span>
+        <span
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 999,
+            padding: "1px 7px",
+            background: "var(--floating)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          📋 {dbData.tables?.length || 0} tables
+        </span>
         <span>Relations: {dbData.relationships?.length || 0}</span>
+        {dbConnectionSummary && (
+          <span
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 999,
+              padding: "1px 7px",
+              color: "var(--muted)",
+              background: "var(--floating)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {dbConnectionSummary.connectionCount} connections
+          </span>
+        )}
         {costConfigured && (
           <span
             style={{
