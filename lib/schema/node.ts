@@ -281,6 +281,12 @@ export const DatabaseQueryOperationSchema = z.enum([
   "DELETE",
 ]);
 
+export const DatabaseQueryComplexitySchema = z.enum([
+  "simple",
+  "moderate",
+  "complex",
+]);
+
 export const DatabaseSeedStrategySchema = z.enum([
   "random",
   "fixture",
@@ -294,6 +300,10 @@ export const DatabaseQuerySchema = z.object({
   target: z.string(),
   conditions: z.string().default(""),
   generatedCode: z.string().default(""),
+  estimatedRowsScanned: z.number().optional(),
+  usesIndex: z.boolean().optional(),
+  complexity: DatabaseQueryComplexitySchema.optional(),
+  suggestedIndexes: z.array(z.string()).optional(),
 });
 
 export const DatabaseMigrationSchema = z.object({
@@ -1007,6 +1017,7 @@ export type DatabaseFieldType = z.infer<typeof DatabaseFieldTypeSchema>;
 export type DatabaseRelationType = z.infer<typeof DatabaseRelationTypeSchema>;
 export type DatabaseQuery = z.infer<typeof DatabaseQuerySchema>;
 export type DatabaseQueryOperation = z.infer<typeof DatabaseQueryOperationSchema>;
+export type DatabaseQueryComplexity = z.infer<typeof DatabaseQueryComplexitySchema>;
 export type DatabaseSeed = z.infer<typeof DatabaseSeedSchema>;
 export type DatabaseSeedStrategy = z.infer<typeof DatabaseSeedStrategySchema>;
 export type DatabaseMigration = z.infer<typeof DatabaseMigrationSchema>;
