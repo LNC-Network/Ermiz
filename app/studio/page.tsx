@@ -11,12 +11,19 @@ const FlowCanvas = dynamic(() => import("@/components/canvas/FlowCanvas"), {
   ssr: false,
 });
 
-type WorkspaceTab = "api" | "infra" | "database" | "agent" | "deploy";
+type WorkspaceTab =
+  | "api"
+  | "infra"
+  | "database"
+  | "functions"
+  | "agent"
+  | "deploy";
 
 const tabLabel: Record<WorkspaceTab, string> = {
   api: "API",
   infra: "Infra",
   database: "Database",
+  functions: "Functions",
   agent: "Agent",
   deploy: "Deploy",
 };
@@ -50,13 +57,18 @@ type SidebarSection = {
 
 function Workspace({
   sections,
+  flatList = false,
+  showSearch = false,
 }: {
   sections: SidebarSection[];
+  flatList?: boolean;
+  showSearch?: boolean;
 }) {
   const addNode = useStore((state) => state.addNode);
   const [collapsedSections, setCollapsedSections] = useState<
     Record<string, boolean>
   >({});
+  const [componentSearch, setComponentSearch] = useState("");
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_WIDTH);
@@ -81,6 +93,30 @@ function Workspace({
     gap: 8,
     border: "1px solid transparent",
   };
+
+  const flatItems = useMemo(
+    () =>
+      sections.flatMap((section) =>
+        section.items.map((item, index) => ({
+          ...item,
+          key: `${section.id}-${item.kind}-${item.label}-${index}`,
+          muted: section.muted ?? false,
+        })),
+      ),
+    [sections],
+  );
+
+  const filteredFlatItems = useMemo(() => {
+    if (!flatList) return flatItems;
+    const query = componentSearch.trim().toLowerCase();
+    if (!query) return flatItems;
+    return flatItems.filter(
+      (item) =>
+        item.label.toLowerCase().includes(query) ||
+        item.kind.toLowerCase().includes(query) ||
+        (item.hint?.toLowerCase().includes(query) ?? false),
+    );
+  }, [componentSearch, flatItems, flatList]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -233,110 +269,214 @@ function Workspace({
               overflowX: "hidden",
             }}
           >
-            {sections.map((section) => (
-              <div
-                key={section.id}
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  background: "color-mix(in srgb, var(--panel) 85%, #0b1018 15%)",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "9px 10px",
-                    borderBottom: collapsedSections[section.id]
-                      ? "none"
-                      : "1px solid var(--border)",
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCollapsedSections((prev) => ({
-                        ...prev,
-                        [section.id]: !prev[section.id],
-                      }))
-                    }
+            {flatList ? (
+              <>
+                {showSearch && (
+                  <div
                     style={{
-                      border: "none",
-                      background: "transparent",
-                      color: "var(--muted)",
-                      cursor: "pointer",
-                      padding: 0,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
+                      border: "1px solid var(--border)",
+                      borderRadius: 10,
+                      background: "var(--floating)",
+                      padding: 8,
                     }}
                   >
-                    <span>{collapsedSections[section.id] ? "▸" : "▾"}</span>
-                    <span>{section.title}</span>
-                  </button>
-                  <span style={{ fontSize: 10, color: "var(--muted)" }}>
-                    {section.items.length}
-                  </span>
-                </div>
-                {!collapsedSections[section.id] && (
-                  <div style={{ padding: 8, display: "grid", gap: 6 }}>
-                    {section.items.map((item, index) => (
-                      <div
-                        key={`${section.id}-${item.kind}-${item.label}-${index}`}
-                        style={{
-                          ...sidebarItemStyle,
-                          color: section.muted ? "var(--muted)" : "var(--secondary)",
-                        }}
-                        onClick={() => addNode(item.kind)}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = "var(--floating)";
-                          e.currentTarget.style.color = item.hoverColor;
-                          e.currentTarget.style.borderColor = "var(--border)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = "transparent";
-                          e.currentTarget.style.color = section.muted
-                            ? "var(--muted)"
-                            : "var(--secondary)";
-                          e.currentTarget.style.borderColor = "transparent";
-                        }}
-                      >
-                        <span style={{ fontSize: 12 }}>{item.icon}</span>
-                        <span
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 2,
-                            minWidth: 0,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 12,
-                              fontFamily: item.mono ? "monospace" : "inherit",
-                              lineHeight: 1.2,
-                            }}
-                          >
-                            {item.label}
-                          </span>
-                          {item.hint && (
-                            <span style={{ fontSize: 10, color: "var(--muted)" }}>
-                              {item.hint}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    ))}
+                    <input
+                      type="text"
+                      value={componentSearch}
+                      onChange={(e) => setComponentSearch(e.target.value)}
+                      placeholder="Search components..."
+                      style={{
+                        width: "100%",
+                        border: "1px solid var(--border)",
+                        background: "var(--panel)",
+                        color: "var(--foreground)",
+                        borderRadius: 8,
+                        padding: "7px 9px",
+                        fontSize: 12,
+                        outline: "none",
+                      }}
+                    />
                   </div>
                 )}
-              </div>
-            ))}
+                <div
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    background: "color-mix(in srgb, var(--panel) 85%, #0b1018 15%)",
+                    padding: 8,
+                    display: "grid",
+                    gap: 6,
+                  }}
+                >
+                  {filteredFlatItems.map((item) => (
+                    <div
+                      key={item.key}
+                      style={{
+                        ...sidebarItemStyle,
+                        color: item.muted ? "var(--muted)" : "var(--secondary)",
+                      }}
+                      onClick={() => addNode(item.kind)}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.background = "var(--floating)";
+                        e.currentTarget.style.color = item.hoverColor;
+                        e.currentTarget.style.borderColor = "var(--border)";
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = item.muted
+                          ? "var(--muted)"
+                          : "var(--secondary)";
+                        e.currentTarget.style.borderColor = "transparent";
+                      }}
+                    >
+                      <span style={{ fontSize: 12 }}>{item.icon}</span>
+                      <span
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 2,
+                          minWidth: 0,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontFamily: item.mono ? "monospace" : "inherit",
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {item.label}
+                        </span>
+                        {item.hint && (
+                          <span style={{ fontSize: 10, color: "var(--muted)" }}>
+                            {item.hint}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                  {filteredFlatItems.length === 0 && (
+                    <div
+                      style={{
+                        padding: "8px 10px",
+                        fontSize: 11,
+                        color: "var(--muted)",
+                        textAlign: "center",
+                      }}
+                    >
+                      No components match your search.
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              sections.map((section) => (
+                <div
+                  key={section.id}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    background: "color-mix(in srgb, var(--panel) 85%, #0b1018 15%)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "9px 10px",
+                      borderBottom: collapsedSections[section.id]
+                        ? "none"
+                        : "1px solid var(--border)",
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCollapsedSections((prev) => ({
+                          ...prev,
+                          [section.id]: !prev[section.id],
+                        }))
+                      }
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: "var(--muted)",
+                        cursor: "pointer",
+                        padding: 0,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.1em",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <span>{collapsedSections[section.id] ? "▸" : "▾"}</span>
+                      <span>{section.title}</span>
+                    </button>
+                    <span style={{ fontSize: 10, color: "var(--muted)" }}>
+                      {section.items.length}
+                    </span>
+                  </div>
+                  {!collapsedSections[section.id] && (
+                    <div style={{ padding: 8, display: "grid", gap: 6 }}>
+                      {section.items.map((item, index) => (
+                        <div
+                          key={`${section.id}-${item.kind}-${item.label}-${index}`}
+                          style={{
+                            ...sidebarItemStyle,
+                            color: section.muted
+                              ? "var(--muted)"
+                              : "var(--secondary)",
+                          }}
+                          onClick={() => addNode(item.kind)}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.background = "var(--floating)";
+                            e.currentTarget.style.color = item.hoverColor;
+                            e.currentTarget.style.borderColor = "var(--border)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                            e.currentTarget.style.color = section.muted
+                              ? "var(--muted)"
+                              : "var(--secondary)";
+                            e.currentTarget.style.borderColor = "transparent";
+                          }}
+                        >
+                          <span style={{ fontSize: 12 }}>{item.icon}</span>
+                          <span
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 2,
+                              minWidth: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontFamily: item.mono ? "monospace" : "inherit",
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              {item.label}
+                            </span>
+                            {item.hint && (
+                              <span style={{ fontSize: 10, color: "var(--muted)" }}>
+                                {item.hint}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </aside>
         </div>
       )}
@@ -1480,28 +1620,14 @@ export default function Home() {
   const apiSections: SidebarSection[] = [
     {
       id: "api-processes",
-      title: "Processes",
+      title: "Function Block",
       items: [
         {
           kind: "process",
-          label: "New Process",
+          label: "Function Block",
           icon: "⚙️",
           hoverColor: "#a78bfa",
-          hint: "General workflow logic",
-        },
-        {
-          kind: "process",
-          label: "Auth Process",
-          icon: "🛡️",
-          hoverColor: "#7dd3fc",
-          hint: "Token/session validation",
-        },
-        {
-          kind: "process",
-          label: "Async Worker",
-          icon: "🧠",
-          hoverColor: "#f9a8d4",
-          hint: "Background orchestration",
+          hint: "Single API block that imports from Functions tab",
         },
       ],
     },
@@ -1533,83 +1659,64 @@ export default function Home() {
       ],
     },
     {
-      id: "api-endpoints",
-      title: "API Endpoints",
+      id: "api-interfaces",
+      title: "Interface Blocks",
       items: [
         {
-          kind: "api_get",
-          label: "GET",
-          icon: "🟢",
-          hoverColor: "#4ade80",
-          mono: true,
-          hint: "Fetch resources",
-        },
-        {
-          kind: "api_post",
-          label: "POST",
-          icon: "🟡",
-          hoverColor: "#facc15",
-          mono: true,
-          hint: "Create resources",
-        },
-        {
-          kind: "api_put",
-          label: "PUT",
-          icon: "🔵",
+          kind: "api_rest",
+          label: "REST Interface",
+          icon: "🔗",
           hoverColor: "#60a5fa",
-          mono: true,
-          hint: "Replace resources",
+          hint: "Protocol-level REST contract",
         },
         {
-          kind: "api_delete",
-          label: "DELETE",
-          icon: "🔴",
-          hoverColor: "#ef4444",
-          mono: true,
-          hint: "Remove resources",
+          kind: "api_ws",
+          label: "WebSocket Interface",
+          icon: "🛰️",
+          hoverColor: "#22d3ee",
+          hint: "Raw WebSocket protocol",
         },
         {
-          kind: "api_patch",
-          label: "PATCH",
-          icon: "🟣",
-          hoverColor: "#a78bfa",
-          mono: true,
-          hint: "Partial updates",
+          kind: "api_socketio",
+          label: "Socket.IO Interface",
+          icon: "🧩",
+          hoverColor: "#38bdf8",
+          hint: "Namespaces, rooms, events",
         },
         {
-          kind: "api_post",
-          label: "Webhook Endpoint",
+          kind: "api_webrtc",
+          label: "WebRTC Interface",
+          icon: "📹",
+          hoverColor: "#f472b6",
+          hint: "P2P sessions via signaling",
+        },
+        {
+          kind: "api_graphql",
+          label: "GraphQL Interface",
+          icon: "🕸️",
+          hoverColor: "#c084fc",
+          hint: "Schema-driven queries and mutations",
+        },
+        {
+          kind: "api_grpc",
+          label: "gRPC Interface",
+          icon: "📡",
+          hoverColor: "#34d399",
+          hint: "Protobuf service contract",
+        },
+        {
+          kind: "api_sse",
+          label: "SSE Interface",
+          icon: "📣",
+          hoverColor: "#f59e0b",
+          hint: "Server-to-client event stream",
+        },
+        {
+          kind: "api_webhook",
+          label: "Webhook Interface",
           icon: "🪝",
           hoverColor: "#fb7185",
-          hint: "Inbound third-party events",
-        },
-        {
-          kind: "api_binding",
-          label: "Custom API",
-          icon: "🔗",
-          hoverColor: "var(--secondary)",
-          hint: "Manual endpoint schema",
-        },
-      ],
-      muted: true,
-    },
-    {
-      id: "api-templates",
-      title: "Quick Templates",
-      items: [
-        {
-          kind: "api_get",
-          label: "Health Check",
-          icon: "💚",
-          hoverColor: "#4ade80",
-          hint: "Service status endpoint",
-        },
-        {
-          kind: "process",
-          label: "Validation Pipeline",
-          icon: "✅",
-          hoverColor: "#22d3ee",
-          hint: "Input and schema checks",
+          hint: "Incoming callback endpoint",
         },
       ],
     },
@@ -1671,6 +1778,68 @@ export default function Home() {
       ],
     },
     {
+      id: "infra-interfaces",
+      title: "Interfaces",
+      items: [
+        {
+          kind: "api_rest",
+          label: "REST Interface",
+          icon: "🔗",
+          hoverColor: "#60a5fa",
+          hint: "Expose infra-backed REST contract",
+        },
+        {
+          kind: "api_ws",
+          label: "WebSocket Interface",
+          icon: "🛰️",
+          hoverColor: "#22d3ee",
+          hint: "Expose raw WebSocket contract",
+        },
+        {
+          kind: "api_socketio",
+          label: "Socket.IO Interface",
+          icon: "🧩",
+          hoverColor: "#38bdf8",
+          hint: "Expose Socket.IO contract",
+        },
+        {
+          kind: "api_webrtc",
+          label: "WebRTC Interface",
+          icon: "📹",
+          hoverColor: "#f472b6",
+          hint: "Expose WebRTC contract",
+        },
+        {
+          kind: "api_graphql",
+          label: "GraphQL Interface",
+          icon: "🕸️",
+          hoverColor: "#c084fc",
+          hint: "Expose GraphQL contract",
+        },
+        {
+          kind: "api_grpc",
+          label: "gRPC Interface",
+          icon: "📡",
+          hoverColor: "#34d399",
+          hint: "Expose gRPC service contract",
+        },
+        {
+          kind: "api_sse",
+          label: "SSE Interface",
+          icon: "📣",
+          hoverColor: "#f59e0b",
+          hint: "Expose server-sent event stream",
+        },
+        {
+          kind: "api_webhook",
+          label: "Webhook Interface",
+          icon: "🪝",
+          hoverColor: "#fb7185",
+          hint: "Expose callback endpoint contract",
+        },
+      ],
+    },
+    {
       id: "infra-storage",
       title: "Storage",
       items: [
@@ -1721,6 +1890,68 @@ export default function Home() {
       ],
     },
     {
+      id: "db-interfaces",
+      title: "Interfaces",
+      items: [
+        {
+          kind: "api_rest",
+          label: "REST Interface",
+          icon: "🔗",
+          hoverColor: "#60a5fa",
+          hint: "Data-access contract via REST",
+        },
+        {
+          kind: "api_ws",
+          label: "WebSocket Interface",
+          icon: "🛰️",
+          hoverColor: "#22d3ee",
+          hint: "Realtime data contract (raw WS)",
+        },
+        {
+          kind: "api_socketio",
+          label: "Socket.IO Interface",
+          icon: "🧩",
+          hoverColor: "#38bdf8",
+          hint: "Realtime data contract (Socket.IO)",
+        },
+        {
+          kind: "api_webrtc",
+          label: "WebRTC Interface",
+          icon: "📹",
+          hoverColor: "#f472b6",
+          hint: "Realtime media/signaling contract",
+        },
+        {
+          kind: "api_graphql",
+          label: "GraphQL Interface",
+          icon: "🕸️",
+          hoverColor: "#c084fc",
+          hint: "Data-access contract via GraphQL",
+        },
+        {
+          kind: "api_grpc",
+          label: "gRPC Interface",
+          icon: "📡",
+          hoverColor: "#34d399",
+          hint: "Data-access contract via gRPC",
+        },
+        {
+          kind: "api_sse",
+          label: "SSE Interface",
+          icon: "📣",
+          hoverColor: "#f59e0b",
+          hint: "One-way event stream contract",
+        },
+        {
+          kind: "api_webhook",
+          label: "Webhook Interface",
+          icon: "🪝",
+          hoverColor: "#fb7185",
+          hint: "Inbound callback contract",
+        },
+      ],
+    },
+    {
       id: "db-pipelines",
       title: "Data Pipelines",
       items: [
@@ -1740,17 +1971,26 @@ export default function Home() {
         },
         {
           kind: "process",
-          label: "DB Process",
+          label: "Function Block",
           icon: "⚙️",
           hoverColor: "#a78bfa",
-          hint: "Data operation workflow",
+          hint: "Configurable function logic",
         },
+      ],
+    },
+  ];
+
+  const functionSections: SidebarSection[] = [
+    {
+      id: "functions-business-logic",
+      title: "Business Logic",
+      items: [
         {
           kind: "process",
-          label: "Cleanup Job",
-          icon: "🧹",
-          hoverColor: "#22d3ee",
-          hint: "Retention and archiving",
+          label: "Function Block",
+          icon: "⚙️",
+          hoverColor: "#a78bfa",
+          hint: "Define reusable business function",
         },
       ],
     },
@@ -1761,6 +2001,8 @@ export default function Home() {
       ? "Deploy workspace ready"
       : activeTab === "agent"
       ? "Agent view ready"
+      : activeTab === "functions"
+      ? "Functions workspace ready"
       : activeTab === "database"
         ? "Database workspace ready"
       : activeTab === "infra"
@@ -1832,6 +2074,7 @@ export default function Home() {
       savedTab === "api" ||
       savedTab === "infra" ||
       savedTab === "database" ||
+      savedTab === "functions" ||
       savedTab === "agent" ||
       savedTab === "deploy"
     ) {
@@ -2361,8 +2604,12 @@ export default function Home() {
                 ? apiSections
                 : activeTab === "infra"
                   ? infraSections
-                  : databaseSections
+                  : activeTab === "database"
+                    ? databaseSections
+                    : functionSections
             }
+            flatList={activeTab === "api"}
+            showSearch={activeTab === "api"}
           />
         )}
       </div>

@@ -165,6 +165,8 @@ const infraFieldSets: Record<
 export function PropertyInspector({ width = 320 }: { width?: number }) {
   const {
     nodes,
+    activeTab,
+    graphs,
     updateNodeData,
     deleteNode,
     addInput,
@@ -176,6 +178,8 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
   } = useStore(
     useShallow((state) => ({
       nodes: state.nodes,
+      activeTab: state.activeTab,
+      graphs: state.graphs,
       updateNodeData: state.updateNodeData,
       deleteNode: state.deleteNode,
       addInput: state.addInput,
@@ -236,6 +240,30 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
 
   const nodeData = selectedNode.data as NodeData;
   const kind = nodeData.kind;
+  const apiNode = kind === "api_binding" ? (nodeData as ApiBinding) : null;
+  const apiProtocol =
+    apiNode?.protocol ?? (apiNode?.apiType === "asyncapi" ? "ws" : "rest");
+  const isRestProtocol = apiProtocol === "rest";
+  const isWsProtocol = apiProtocol === "ws";
+  const isSocketIOProtocol = apiProtocol === "socket.io";
+  const isWebRtcProtocol = apiProtocol === "webrtc";
+  const isGraphqlProtocol = apiProtocol === "graphql";
+  const isGrpcProtocol = apiProtocol === "grpc";
+  const isSseProtocol = apiProtocol === "sse";
+  const isWebhookProtocol = apiProtocol === "webhook";
+  const functionDefinitions = (graphs.functions?.nodes || [])
+    .map((node) => node.data as NodeData)
+    .filter((data): data is ProcessDefinition => data.kind === "process")
+    .map((process) => ({
+      id: process.id,
+      label: process.label || process.id,
+    }));
+  const importedFunctionIds =
+    kind === "process" && activeTab === "api"
+      ? (nodeData as ProcessDefinition).steps
+          .filter((step) => step.kind === "ref" && Boolean(step.ref))
+          .map((step) => step.ref as string)
+      : [];
 
   const handleUpdate = (updates: Partial<NodeData>) => {
     updateNodeData(selectedNode.id, updates);
@@ -293,23 +321,12 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
         <>
           <div style={sectionStyle}>
             <div style={labelStyle}>Process Type</div>
-            <select
-              value={(nodeData as ProcessDefinition).processType}
-              onChange={(e) =>
-                handleUpdate({
-                  processType: e.target.value,
-                } as Partial<ProcessDefinition>)
-              }
-              style={selectStyle}
-            >
-              <option value="calculation">Calculation</option>
-              <option value="database_workflow">Database Workflow</option>
-              <option value="queue_consumer">Queue Consumer</option>
-              <option value="job">Job</option>
-              <option value="orchestrated_workflow">
-                Orchestrated Workflow
-              </option>
-            </select>
+            <input
+              type="text"
+              value="Function Block"
+              disabled
+              style={{ ...inputStyle, opacity: 0.85, cursor: "not-allowed" }}
+            />
           </div>
 
           <div>
@@ -329,6 +346,90 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
               <option value="event_driven">Event Driven</option>
             </select>
           </div>
+
+          {activeTab === "api" && (
+            <div style={sectionStyle}>
+              <div
+                style={{
+                  ...labelStyle,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
+                <span>Imported Functions</span>
+                <span style={{ color: "var(--secondary)" }}>
+                  {importedFunctionIds.length}
+                </span>
+              </div>
+              {functionDefinitions.length === 0 ? (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "var(--muted)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  No functions found. Add function blocks in the Functions tab.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {functionDefinitions.map((fn) => {
+                    const checked = importedFunctionIds.includes(fn.id);
+                    return (
+                      <label
+                        key={fn.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          fontSize: 11,
+                          color: "var(--secondary)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          padding: "6px 8px",
+                          background: "var(--floating)",
+                        }}
+                      >
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {fn.label}
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => {
+                            const currentRefs = new Set(importedFunctionIds);
+                            if (event.target.checked) {
+                              currentRefs.add(fn.id);
+                            } else {
+                              currentRefs.delete(fn.id);
+                            }
+                            const nextSteps = Array.from(currentRefs).map(
+                              (ref, index) => ({
+                                id: `import_${index + 1}_${ref}`,
+                                kind: "ref" as const,
+                                ref,
+                                description: `Import ${ref}`,
+                              }),
+                            );
+                            handleUpdate({
+                              steps: nextSteps,
+                            } as Partial<ProcessDefinition>);
+                          }}
+                          style={{ accentColor: "var(--primary)" }}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 6 }}>
+                API Function Block imports reusable logic from Functions tab.
+              </div>
+            </div>
+          )}
 
           {/* Inputs Section */}
           <div style={sectionStyle}>
@@ -512,7 +613,9 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                 fontStyle: "italic",
               }}
             >
-              Steps are defined in the visual graph
+              {activeTab === "api"
+                ? "Imported functions are tracked as ref steps."
+                : "Steps are defined in the visual graph"}
             </div>
           </div>
         </>
@@ -853,57 +956,1149 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
         </>
       )}
 
-      {/* API Binding-specific fields */}
+      {/* Interface block-specific fields */}
       {kind === "api_binding" && (
         <>
-          {/* API Type */}
+          {/* Protocol */}
           <div style={sectionStyle}>
-            <div style={labelStyle}>API Type</div>
+            <div style={labelStyle}>Protocol</div>
             <select
-              value={(nodeData as ApiBinding).apiType}
-              onChange={(e) =>
-                handleUpdate({ apiType: e.target.value } as Partial<ApiBinding>)
-              }
+              value={apiProtocol}
+              onChange={(e) => {
+                const nextProtocol = e.target.value as
+                  | "rest"
+                  | "ws"
+                  | "socket.io"
+                  | "webrtc"
+                  | "graphql"
+                  | "grpc"
+                  | "sse"
+                  | "webhook";
+
+                if (nextProtocol === "rest") {
+                  handleUpdate({
+                    protocol: "rest",
+                    apiType: "openapi",
+                    instance: undefined,
+                    method: "GET",
+                    route: "/api/resource",
+                    request: {
+                      pathParams: [],
+                      queryParams: [],
+                      headers: [],
+                      body: { contentType: "application/json", schema: [] },
+                    },
+                    responses: {
+                      success: { statusCode: 200, schema: [] },
+                      error: { statusCode: 400, schema: [] },
+                    },
+                    security: { type: "none", scopes: [] },
+                    rateLimit: {
+                      enabled: false,
+                      requests: 100,
+                      window: "minute",
+                    },
+                  } as Partial<ApiBinding>);
+                  return;
+                }
+
+                const instanceDefaults =
+                  nextProtocol === "ws"
+                    ? {
+                        protocol: "ws" as const,
+                        config: {
+                          endpoint: "/ws/events",
+                          pingIntervalSec: 20,
+                          pingTimeoutSec: 10,
+                          maxMessageSizeKb: 256,
+                          maxConnections: 5000,
+                          auth: { type: "none" as const, scopes: [] as string[] },
+                          rateLimit: {
+                            enabled: false,
+                            requests: 100,
+                            window: "minute" as const,
+                          },
+                        },
+                      }
+                    : nextProtocol === "socket.io"
+                      ? {
+                          protocol: "socket.io" as const,
+                          config: {
+                            endpoint: "/socket.io",
+                            namespaces: ["/"],
+                            rooms: [],
+                            events: [],
+                            ackTimeoutMs: 5000,
+                            auth: { type: "none" as const, scopes: [] as string[] },
+                            rateLimit: {
+                              enabled: false,
+                              requests: 100,
+                            window: "minute" as const,
+                          },
+                        },
+                      }
+                      : nextProtocol === "webrtc"
+                        ? {
+                          protocol: "webrtc" as const,
+                          config: {
+                            signalingTransportRef: "api_ws_signaling",
+                            stunServers: ["stun:stun.l.google.com:19302"],
+                            turnServers: [],
+                            peerLimit: 4,
+                            topology: "p2p" as const,
+                          },
+                        }
+                        : nextProtocol === "graphql"
+                          ? {
+                              protocol: "graphql" as const,
+                              config: {
+                                endpoint: "/graphql",
+                                schemaSDL: "type Query { health: String! }",
+                                operations: {
+                                  queries: true,
+                                  mutations: true,
+                                  subscriptions: true,
+                                },
+                              },
+                            }
+                          : nextProtocol === "grpc"
+                            ? {
+                                protocol: "grpc" as const,
+                                config: {
+                                  protobufDefinition:
+                                    "syntax = \"proto3\";\nservice ApiService { rpc Execute (ExecuteRequest) returns (ExecuteResponse); }\nmessage ExecuteRequest { string id = 1; }\nmessage ExecuteResponse { string status = 1; }",
+                                  service: "ApiService",
+                                  rpcMethods: [{ name: "Execute", type: "unary" as const }],
+                                },
+                              }
+                            : nextProtocol === "sse"
+                              ? {
+                                  protocol: "sse" as const,
+                                  config: {
+                                    endpoint: "/events",
+                                    eventName: "update",
+                                    retryMs: 5000,
+                                    heartbeatSec: 30,
+                                    direction: "server_to_client" as const,
+                                  },
+                                }
+                              : {
+                                  protocol: "webhook" as const,
+                                  config: {
+                                    endpoint: "/webhooks/incoming",
+                                    signatureVerification: {
+                                      enabled: true,
+                                      headerName: "X-Signature",
+                                      secretRef: "WEBHOOK_SECRET",
+                                    },
+                                    retryPolicy: {
+                                      enabled: true,
+                                      maxAttempts: 5,
+                                      backoff: "exponential" as const,
+                                    },
+                                  },
+                                };
+
+                handleUpdate({
+                  protocol: nextProtocol,
+                  apiType:
+                    nextProtocol === "ws" ||
+                    nextProtocol === "socket.io" ||
+                    nextProtocol === "webrtc" ||
+                    nextProtocol === "sse"
+                      ? "asyncapi"
+                      : "openapi",
+                  method: undefined,
+                  route: undefined,
+                  request: undefined,
+                  responses: undefined,
+                  security: undefined,
+                  rateLimit: undefined,
+                  instance: instanceDefaults,
+                } as Partial<ApiBinding>);
+              }}
               style={selectStyle}
             >
-              <option value="openapi">OpenAPI (REST)</option>
-              <option value="asyncapi">AsyncAPI (Events)</option>
+              <option value="rest">REST</option>
+              <option value="ws">WebSocket</option>
+              <option value="socket.io">Socket.IO</option>
+              <option value="webrtc">WebRTC</option>
+              <option value="graphql">GraphQL</option>
+              <option value="grpc">gRPC</option>
+              <option value="sse">SSE</option>
+              <option value="webhook">Webhook</option>
             </select>
           </div>
 
-          {/* HTTP Method & Route */}
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={{ width: 100 }}>
-              <div style={labelStyle}>Method</div>
-              <select
-                value={(nodeData as ApiBinding).method}
-                onChange={(e) =>
-                  handleUpdate({
-                    method: e.target.value,
-                  } as Partial<ApiBinding>)
-                }
-                style={selectStyle}
-              >
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-                <option value="DELETE">DELETE</option>
-                <option value="PATCH">PATCH</option>
-              </select>
+          {isRestProtocol ? (
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ width: 100 }}>
+                <div style={labelStyle}>Method</div>
+                <select
+                  value={(nodeData as ApiBinding).method}
+                  onChange={(e) =>
+                    handleUpdate({
+                      method: e.target.value,
+                    } as Partial<ApiBinding>)
+                  }
+                  style={selectStyle}
+                >
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="DELETE">DELETE</option>
+                  <option value="PATCH">PATCH</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={labelStyle}>Route</div>
+                <input
+                  type="text"
+                  value={(nodeData as ApiBinding).route || ""}
+                  onChange={(e) =>
+                    handleUpdate({ route: e.target.value } as Partial<ApiBinding>)
+                  }
+                  placeholder="/api/resource"
+                  style={inputStyle}
+                />
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={labelStyle}>Route</div>
-              <input
-                type="text"
-                value={(nodeData as ApiBinding).route}
-                onChange={(e) =>
-                  handleUpdate({ route: e.target.value } as Partial<ApiBinding>)
-                }
-                placeholder="/api/resource"
-                style={inputStyle}
-              />
+          ) : (
+            <div style={sectionStyle}>
+              <div style={{ ...labelStyle, marginBottom: 8 }}>
+                Protocol Config
+              </div>
+
+              {(isWsProtocol || isSocketIOProtocol) && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={labelStyle}>Endpoint</div>
+                  <input
+                    type="text"
+                    value={(apiNode?.instance?.config as { endpoint?: string } | undefined)?.endpoint || ""}
+                    onChange={(e) =>
+                      handleUpdate({
+                        instance: {
+                          ...(apiNode?.instance as object),
+                          config: {
+                            ...(apiNode?.instance?.config as object),
+                            endpoint: e.target.value,
+                          },
+                        },
+                      } as Partial<ApiBinding>)
+                    }
+                    placeholder={isSocketIOProtocol ? "/socket.io" : "/ws/events"}
+                    style={inputStyle}
+                  />
+                </div>
+              )}
+
+              {isWsProtocol && (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div>
+                      <div style={labelStyle}>Ping Interval (sec)</div>
+                      <input
+                        type="number"
+                        value={(apiNode?.instance?.config as { pingIntervalSec?: number } | undefined)?.pingIntervalSec || 20}
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                pingIntervalSec: Number(e.target.value || 20),
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Ping Timeout (sec)</div>
+                      <input
+                        type="number"
+                        value={(apiNode?.instance?.config as { pingTimeoutSec?: number } | undefined)?.pingTimeoutSec || 10}
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                pingTimeoutSec: Number(e.target.value || 10),
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                    <div>
+                      <div style={labelStyle}>Max Size (KB)</div>
+                      <input
+                        type="number"
+                        value={(apiNode?.instance?.config as { maxMessageSizeKb?: number } | undefined)?.maxMessageSizeKb || 256}
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                maxMessageSizeKb: Number(e.target.value || 256),
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Max Connections</div>
+                      <input
+                        type="number"
+                        value={(apiNode?.instance?.config as { maxConnections?: number } | undefined)?.maxConnections || 5000}
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                maxConnections: Number(e.target.value || 5000),
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {isSocketIOProtocol && (
+                <>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={labelStyle}>Namespaces (comma-separated)</div>
+                    <input
+                      type="text"
+                      value={((apiNode?.instance?.config as { namespaces?: string[] } | undefined)?.namespaces || []).join(", ")}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              namespaces: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={labelStyle}>Rooms (comma-separated)</div>
+                    <input
+                      type="text"
+                      value={((apiNode?.instance?.config as { rooms?: string[] } | undefined)?.rooms || []).join(", ")}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              rooms: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={labelStyle}>Events (comma-separated)</div>
+                    <input
+                      type="text"
+                      value={((apiNode?.instance?.config as { events?: string[] } | undefined)?.events || []).join(", ")}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              events: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={labelStyle}>Ack Timeout (ms)</div>
+                    <input
+                      type="number"
+                      value={(apiNode?.instance?.config as { ackTimeoutMs?: number } | undefined)?.ackTimeoutMs || 5000}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              ackTimeoutMs: Number(e.target.value || 5000),
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                </>
+              )}
+
+              {isWebRtcProtocol && (
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={labelStyle}>Signaling Transport Reference</div>
+                    <input
+                      type="text"
+                      value={(apiNode?.instance?.config as { signalingTransportRef?: string } | undefined)?.signalingTransportRef || ""}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              signalingTransportRef: e.target.value,
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={{
+                        ...inputStyle,
+                        borderColor:
+                          ((apiNode?.instance?.config as { signalingTransportRef?: string } | undefined)?.signalingTransportRef || "").trim()
+                            ? "var(--border)"
+                            : "var(--destructive)",
+                      }}
+                    />
+                    {!((apiNode?.instance?.config as { signalingTransportRef?: string } | undefined)?.signalingTransportRef || "").trim() && (
+                      <div style={{ fontSize: 10, color: "var(--destructive)", marginTop: 4 }}>
+                        WebRTC requires signaling transport reference.
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={labelStyle}>STUN Servers (comma-separated)</div>
+                    <input
+                      type="text"
+                      value={((apiNode?.instance?.config as { stunServers?: string[] } | undefined)?.stunServers || []).join(", ")}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              stunServers: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={labelStyle}>TURN Servers (comma-separated)</div>
+                    <input
+                      type="text"
+                      value={((apiNode?.instance?.config as { turnServers?: string[] } | undefined)?.turnServers || []).join(", ")}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              turnServers: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                    <div>
+                      <div style={labelStyle}>Peer Limit</div>
+                      <input
+                        type="number"
+                        value={(apiNode?.instance?.config as { peerLimit?: number } | undefined)?.peerLimit || 4}
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                peerLimit: Number(e.target.value || 4),
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Topology</div>
+                      <input
+                        type="text"
+                        value="p2p"
+                        disabled
+                        style={{ ...inputStyle, opacity: 0.85, cursor: "not-allowed" }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {isGraphqlProtocol && (
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={labelStyle}>Endpoint</div>
+                    <input
+                      type="text"
+                      value={(apiNode?.instance?.config as { endpoint?: string } | undefined)?.endpoint || ""}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              endpoint: e.target.value,
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={labelStyle}>Schema SDL</div>
+                    <textarea
+                      value={(apiNode?.instance?.config as { schemaSDL?: string } | undefined)?.schemaSDL || ""}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              schemaSDL: e.target.value,
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={{ ...inputStyle, minHeight: 90, resize: "vertical", fontFamily: "monospace" }}
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {[
+                      { key: "queries", label: "Queries" },
+                      { key: "mutations", label: "Mutations" },
+                      { key: "subscriptions", label: "Subscriptions" },
+                    ].map((op) => (
+                      <label
+                        key={op.key}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: 11,
+                          color: "var(--secondary)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            Boolean(
+                              (apiNode?.instance?.config as {
+                                operations?: Record<string, boolean>;
+                              } | undefined)?.operations?.[op.key],
+                            )
+                          }
+                          onChange={(e) =>
+                            handleUpdate({
+                              instance: {
+                                ...(apiNode?.instance as object),
+                                config: {
+                                  ...(apiNode?.instance?.config as object),
+                                  operations: {
+                                    ...((apiNode?.instance?.config as { operations?: object } | undefined)
+                                      ?.operations as object),
+                                    [op.key]: e.target.checked,
+                                  },
+                                },
+                              },
+                            } as Partial<ApiBinding>)
+                          }
+                          style={{ accentColor: "var(--primary)" }}
+                        />
+                        {op.label}
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {isGrpcProtocol && (
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={labelStyle}>Service</div>
+                    <input
+                      type="text"
+                      value={(apiNode?.instance?.config as { service?: string } | undefined)?.service || ""}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              service: e.target.value,
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={labelStyle}>RPC Methods (name:type, comma-separated)</div>
+                    <input
+                      type="text"
+                      value={((apiNode?.instance?.config as { rpcMethods?: Array<{ name?: string; type?: string }> } | undefined)?.rpcMethods || [])
+                        .map((method) => `${method.name || ""}:${method.type || "unary"}`)
+                        .join(", ")}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              rpcMethods: e.target.value
+                                .split(",")
+                                .map((entry) => entry.trim())
+                                .filter(Boolean)
+                                .map((entry) => {
+                                  const [rawName, rawType] = entry.split(":").map((v) => v.trim());
+                                  const type = rawType || "unary";
+                                  const normalizedType =
+                                    type === "server_stream" ||
+                                    type === "client_stream" ||
+                                    type === "bidirectional_stream"
+                                      ? type
+                                      : "unary";
+                                  return {
+                                    name: rawName || "Method",
+                                    type: normalizedType,
+                                  };
+                                }),
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      placeholder="Execute:unary, StreamUpdates:server_stream"
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div>
+                    <div style={labelStyle}>Protobuf Definition</div>
+                    <textarea
+                      value={
+                        (apiNode?.instance?.config as { protobufDefinition?: string } | undefined)
+                          ?.protobufDefinition || ""
+                      }
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              protobufDefinition: e.target.value,
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={{ ...inputStyle, minHeight: 120, resize: "vertical", fontFamily: "monospace" }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {isSseProtocol && (
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={labelStyle}>Endpoint</div>
+                    <input
+                      type="text"
+                      value={(apiNode?.instance?.config as { endpoint?: string } | undefined)?.endpoint || ""}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              endpoint: e.target.value,
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={labelStyle}>Event Name</div>
+                    <input
+                      type="text"
+                      value={(apiNode?.instance?.config as { eventName?: string } | undefined)?.eventName || ""}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              eventName: e.target.value,
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div>
+                      <div style={labelStyle}>Retry (ms)</div>
+                      <input
+                        type="number"
+                        value={(apiNode?.instance?.config as { retryMs?: number } | undefined)?.retryMs || 5000}
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                retryMs: Number(e.target.value || 5000),
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <div style={labelStyle}>Heartbeat (sec)</div>
+                      <input
+                        type="number"
+                        value={(apiNode?.instance?.config as { heartbeatSec?: number } | undefined)?.heartbeatSec || 30}
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                heartbeatSec: Number(e.target.value || 30),
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={labelStyle}>Direction</div>
+                    <input
+                      type="text"
+                      value="server_to_client"
+                      disabled
+                      style={{ ...inputStyle, opacity: 0.85, cursor: "not-allowed" }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {isWebhookProtocol && (
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={labelStyle}>Endpoint</div>
+                    <input
+                      type="text"
+                      value={(apiNode?.instance?.config as { endpoint?: string } | undefined)?.endpoint || ""}
+                      onChange={(e) =>
+                        handleUpdate({
+                          instance: {
+                            ...(apiNode?.instance as object),
+                            config: {
+                              ...(apiNode?.instance?.config as object),
+                              endpoint: e.target.value,
+                            },
+                          },
+                        } as Partial<ApiBinding>)
+                      }
+                      style={inputStyle}
+                    />
+                  </div>
+
+                  <div style={sectionStyle}>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 11,
+                        color: "var(--secondary)",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={
+                          (apiNode?.instance?.config as {
+                            signatureVerification?: { enabled?: boolean };
+                          } | undefined)?.signatureVerification?.enabled || false
+                        }
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                signatureVerification: {
+                                  ...((apiNode?.instance?.config as {
+                                    signatureVerification?: object;
+                                  } | undefined)?.signatureVerification as object),
+                                  enabled: e.target.checked,
+                                },
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={{ accentColor: "var(--primary)" }}
+                      />
+                      Enable Signature Verification
+                    </label>
+
+                    {(apiNode?.instance?.config as {
+                      signatureVerification?: { enabled?: boolean };
+                    } | undefined)?.signatureVerification?.enabled && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+                        <div>
+                          <div style={labelStyle}>Header Name</div>
+                          <input
+                            type="text"
+                            value={
+                              (apiNode?.instance?.config as {
+                                signatureVerification?: { headerName?: string };
+                              } | undefined)?.signatureVerification?.headerName || ""
+                            }
+                            onChange={(e) =>
+                              handleUpdate({
+                                instance: {
+                                  ...(apiNode?.instance as object),
+                                  config: {
+                                    ...(apiNode?.instance?.config as object),
+                                    signatureVerification: {
+                                      ...((apiNode?.instance?.config as {
+                                        signatureVerification?: object;
+                                      } | undefined)?.signatureVerification as object),
+                                      headerName: e.target.value,
+                                    },
+                                  },
+                                },
+                              } as Partial<ApiBinding>)
+                            }
+                            style={inputStyle}
+                          />
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Secret Ref</div>
+                          <input
+                            type="text"
+                            value={
+                              (apiNode?.instance?.config as {
+                                signatureVerification?: { secretRef?: string };
+                              } | undefined)?.signatureVerification?.secretRef || ""
+                            }
+                            onChange={(e) =>
+                              handleUpdate({
+                                instance: {
+                                  ...(apiNode?.instance as object),
+                                  config: {
+                                    ...(apiNode?.instance?.config as object),
+                                    signatureVerification: {
+                                      ...((apiNode?.instance?.config as {
+                                        signatureVerification?: object;
+                                      } | undefined)?.signatureVerification as object),
+                                      secretRef: e.target.value,
+                                    },
+                                  },
+                                },
+                              } as Partial<ApiBinding>)
+                            }
+                            style={inputStyle}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={sectionStyle}>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 11,
+                        color: "var(--secondary)",
+                        marginBottom: 8,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={
+                          (apiNode?.instance?.config as {
+                            retryPolicy?: { enabled?: boolean };
+                          } | undefined)?.retryPolicy?.enabled || false
+                        }
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                retryPolicy: {
+                                  ...((apiNode?.instance?.config as {
+                                    retryPolicy?: object;
+                                  } | undefined)?.retryPolicy as object),
+                                  enabled: e.target.checked,
+                                },
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={{ accentColor: "var(--primary)" }}
+                      />
+                      Enable Retry Policy
+                    </label>
+
+                    {(apiNode?.instance?.config as {
+                      retryPolicy?: { enabled?: boolean };
+                    } | undefined)?.retryPolicy?.enabled && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div>
+                          <div style={labelStyle}>Max Attempts</div>
+                          <input
+                            type="number"
+                            value={
+                              (apiNode?.instance?.config as {
+                                retryPolicy?: { maxAttempts?: number };
+                              } | undefined)?.retryPolicy?.maxAttempts || 5
+                            }
+                            onChange={(e) =>
+                              handleUpdate({
+                                instance: {
+                                  ...(apiNode?.instance as object),
+                                  config: {
+                                    ...(apiNode?.instance?.config as object),
+                                    retryPolicy: {
+                                      ...((apiNode?.instance?.config as {
+                                        retryPolicy?: object;
+                                      } | undefined)?.retryPolicy as object),
+                                      maxAttempts: Number(e.target.value || 5),
+                                    },
+                                  },
+                                },
+                              } as Partial<ApiBinding>)
+                            }
+                            style={inputStyle}
+                          />
+                        </div>
+                        <div>
+                          <div style={labelStyle}>Backoff</div>
+                          <select
+                            value={
+                              (apiNode?.instance?.config as {
+                                retryPolicy?: { backoff?: string };
+                              } | undefined)?.retryPolicy?.backoff || "exponential"
+                            }
+                            onChange={(e) =>
+                              handleUpdate({
+                                instance: {
+                                  ...(apiNode?.instance as object),
+                                  config: {
+                                    ...(apiNode?.instance?.config as object),
+                                    retryPolicy: {
+                                      ...((apiNode?.instance?.config as {
+                                        retryPolicy?: object;
+                                      } | undefined)?.retryPolicy as object),
+                                      backoff: e.target.value,
+                                    },
+                                  },
+                                },
+                              } as Partial<ApiBinding>)
+                            }
+                            style={selectStyle}
+                          >
+                            <option value="fixed">Fixed</option>
+                            <option value="linear">Linear</option>
+                            <option value="exponential">Exponential</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-          </div>
+          )}
+
+          {(isWsProtocol || isSocketIOProtocol) && (
+            <>
+              <div style={sectionStyle}>
+                <div style={labelStyle}>Auth</div>
+                <select
+                  value={
+                    (apiNode?.instance?.config as { auth?: { type?: string } } | undefined)?.auth?.type ||
+                    "none"
+                  }
+                  onChange={(e) =>
+                    handleUpdate({
+                      instance: {
+                        ...(apiNode?.instance as object),
+                        config: {
+                          ...(apiNode?.instance?.config as object),
+                          auth: {
+                            ...((apiNode?.instance?.config as { auth?: object } | undefined)?.auth as object),
+                            type: e.target.value,
+                          },
+                        },
+                      },
+                    } as Partial<ApiBinding>)
+                  }
+                  style={selectStyle}
+                >
+                  <option value="none">None</option>
+                  <option value="api_key">API Key</option>
+                  <option value="bearer">Bearer</option>
+                  <option value="oauth2">OAuth2</option>
+                  <option value="basic">Basic</option>
+                </select>
+              </div>
+
+              <div style={sectionStyle}>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 11,
+                    color: "var(--secondary)",
+                    marginBottom: 8,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={
+                      (apiNode?.instance?.config as { rateLimit?: { enabled?: boolean } } | undefined)?.rateLimit
+                        ?.enabled || false
+                    }
+                    onChange={(e) =>
+                      handleUpdate({
+                        instance: {
+                          ...(apiNode?.instance as object),
+                          config: {
+                            ...(apiNode?.instance?.config as object),
+                            rateLimit: {
+                              ...((apiNode?.instance?.config as { rateLimit?: object } | undefined)
+                                ?.rateLimit as object),
+                              enabled: e.target.checked,
+                            },
+                          },
+                        },
+                      } as Partial<ApiBinding>)
+                    }
+                    style={{ accentColor: "var(--primary)" }}
+                  />
+                  Enable Rate Limiting
+                </label>
+                {(apiNode?.instance?.config as { rateLimit?: { enabled?: boolean } } | undefined)?.rateLimit
+                  ?.enabled && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={labelStyle}>Requests</div>
+                      <input
+                        type="number"
+                        value={
+                          (apiNode?.instance?.config as {
+                            rateLimit?: { requests?: number };
+                          } | undefined)?.rateLimit?.requests || 100
+                        }
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                rateLimit: {
+                                  ...((apiNode?.instance?.config as { rateLimit?: object } | undefined)
+                                    ?.rateLimit as object),
+                                  requests: Number(e.target.value || 100),
+                                },
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={labelStyle}>Per</div>
+                      <select
+                        value={
+                          (apiNode?.instance?.config as {
+                            rateLimit?: { window?: string };
+                          } | undefined)?.rateLimit?.window || "minute"
+                        }
+                        onChange={(e) =>
+                          handleUpdate({
+                            instance: {
+                              ...(apiNode?.instance as object),
+                              config: {
+                                ...(apiNode?.instance?.config as object),
+                                rateLimit: {
+                                  ...((apiNode?.instance?.config as { rateLimit?: object } | undefined)
+                                    ?.rateLimit as object),
+                                  window: e.target.value,
+                                },
+                              },
+                            },
+                          } as Partial<ApiBinding>)
+                        }
+                        style={selectStyle}
+                      >
+                        <option value="second">Second</option>
+                        <option value="minute">Minute</option>
+                        <option value="hour">Hour</option>
+                        <option value="day">Day</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Version & Deprecated */}
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
@@ -946,7 +2141,8 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
           </div>
 
           {/* Security */}
-          <div style={sectionStyle}>
+          {isRestProtocol && (
+            <div style={sectionStyle}>
             <div style={labelStyle}>Security</div>
             <select
               value={(nodeData as ApiBinding).security?.type || "none"}
@@ -990,10 +2186,12 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                 />
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           {/* Rate Limiting */}
-          <div style={sectionStyle}>
+          {isRestProtocol && (
+            <div style={sectionStyle}>
             <label
               style={{
                 display: "flex",
@@ -1065,19 +2263,24 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                 </div>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           {/* Request Schema Tabs */}
-          <div style={sectionStyle}>
+          {isRestProtocol && (
+            <div style={sectionStyle}>
             <div style={{ ...labelStyle, marginBottom: 8 }}>Request</div>
 
             {/* Tab Buttons */}
             <div style={{ display: "flex", gap: 2, marginBottom: 12 }}>
               {(["body", "headers", "query"] as const).map((tab) => {
-                const showBody = ["POST", "PUT", "PATCH"].includes(
-                  (nodeData as ApiBinding).method,
-                );
+                const showBody =
+                  isWsProtocol ||
+                  ["POST", "PUT", "PATCH"].includes(
+                    (nodeData as ApiBinding).method,
+                  );
                 if (tab === "body" && !showBody) return null;
+                if (isWsProtocol && tab === "query") return null;
 
                 const counts: Record<string, number> = {
                   body:
@@ -1126,9 +2329,10 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
 
             {/* Body Tab */}
             {requestTab === "body" &&
-              ["POST", "PUT", "PATCH"].includes(
-                (nodeData as ApiBinding).method,
-              ) && (
+              (isWsProtocol ||
+                ["POST", "PUT", "PATCH"].includes(
+                  (nodeData as ApiBinding).method,
+                )) && (
                 <>
                   {((nodeData as ApiBinding).request?.body?.schema || []).map(
                     (field, i) => (
@@ -1270,7 +2474,7 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
             )}
 
             {/* Query Tab */}
-            {requestTab === "query" && (
+            {requestTab === "query" && !isWsProtocol && (
               <>
                 {((nodeData as ApiBinding).request?.queryParams || []).map(
                   (field, i) => (
@@ -1357,10 +2561,12 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                 </div>
               );
             })()}
-          </div>
+            </div>
+          )}
 
           {/* Response Success Schema */}
-          <div style={sectionStyle}>
+          {isRestProtocol && (
+            <div style={sectionStyle}>
             <div
               style={{
                 ...labelStyle,
@@ -1449,11 +2655,12 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
               💡 Error responses (400, 404, 500) are auto-generated based on
               validation & database errors
             </div>
-          </div>
+            </div>
+          )}
 
-          {/* Process Reference */}
+          {/* Function Block Reference */}
           <div style={sectionStyle}>
-            <div style={labelStyle}>Invokes Process</div>
+            <div style={labelStyle}>Invokes Function Block</div>
             <input
               type="text"
               value={(nodeData as ApiBinding).processRef}
@@ -1466,7 +2673,7 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
               style={inputStyle}
             />
             <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
-              Reference to the process this API invokes
+              Reference to the function block this interface invokes
             </div>
           </div>
         </>

@@ -114,11 +114,7 @@ export const ProcessStepSchema = z.object({
 // Process Definition (Core Unit)
 // ============================================
 export const ProcessTypeSchema = z.enum([
-  "calculation",
-  "database_workflow",
-  "queue_consumer",
-  "job",
-  "orchestrated_workflow",
+  "function_block",
 ]);
 
 export const ExecutionModeSchema = z.enum([
@@ -373,6 +369,17 @@ export const HttpMethodSchema = z.enum([
   "PATCH",
 ]);
 
+export const ApiProtocolSchema = z.enum([
+  "rest",
+  "ws",
+  "socket.io",
+  "webrtc",
+  "graphql",
+  "grpc",
+  "sse",
+  "webhook",
+]);
+
 export const SecuritySchemeSchema = z.object({
   type: z.enum(["none", "api_key", "bearer", "oauth2", "basic"]),
   headerName: z.string().optional(),
@@ -406,33 +413,201 @@ export const ResponseSchema = z.object({
   schema: z.array(OutputFieldSchema),
 });
 
+export const WebSocketConfigSchema = z
+  .object({
+    endpoint: z.string(),
+    pingIntervalSec: z.number().int().positive(),
+    pingTimeoutSec: z.number().int().positive(),
+    maxMessageSizeKb: z.number().int().positive(),
+    maxConnections: z.number().int().positive(),
+    auth: SecuritySchemeSchema,
+    rateLimit: RateLimitSchema,
+  })
+  .strict();
+
+export const SocketIOConfigSchema = z
+  .object({
+    endpoint: z.string(),
+    namespaces: z.array(z.string()),
+    rooms: z.array(z.string()),
+    events: z.array(z.string()),
+    ackTimeoutMs: z.number().int().positive(),
+    auth: SecuritySchemeSchema,
+    rateLimit: RateLimitSchema,
+  })
+  .strict();
+
+export const WebRTCConfigSchema = z
+  .object({
+    signalingTransportRef: z.string().min(1),
+    stunServers: z.array(z.string()),
+    turnServers: z.array(z.string()),
+    peerLimit: z.number().int().positive(),
+    topology: z.literal("p2p"),
+  })
+  .strict();
+
+export const GraphQLConfigSchema = z
+  .object({
+    endpoint: z.string().min(1),
+    schemaSDL: z.string().min(1),
+    operations: z
+      .object({
+        queries: z.boolean(),
+        mutations: z.boolean(),
+        subscriptions: z.boolean(),
+      })
+      .refine(
+        (ops) => ops.queries || ops.mutations || ops.subscriptions,
+        "GraphQL requires at least one operation type",
+      ),
+  })
+  .strict();
+
+export const GrpcConfigSchema = z
+  .object({
+    protobufDefinition: z.string().min(1),
+    service: z.string().min(1),
+    rpcMethods: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1),
+            type: z.enum([
+              "unary",
+              "server_stream",
+              "client_stream",
+              "bidirectional_stream",
+            ]),
+          })
+          .strict(),
+      )
+      .min(1),
+  })
+  .strict();
+
+export const SSEConfigSchema = z
+  .object({
+    endpoint: z.string().min(1),
+    eventName: z.string().min(1),
+    retryMs: z.number().int().positive(),
+    heartbeatSec: z.number().int().positive(),
+    direction: z.literal("server_to_client"),
+  })
+  .strict();
+
+export const WebhookConfigSchema = z
+  .object({
+    endpoint: z.string().min(1),
+    signatureVerification: z
+      .object({
+        enabled: z.boolean(),
+        headerName: z.string(),
+        secretRef: z.string(),
+      })
+      .strict()
+      .optional(),
+    retryPolicy: z
+      .object({
+        enabled: z.boolean(),
+        maxAttempts: z.number().int().positive(),
+        backoff: z.enum(["fixed", "linear", "exponential"]),
+      })
+      .strict(),
+  })
+  .strict();
+
+const WebSocketInstanceSchema = z.object({
+  protocol: z.literal("ws"),
+  config: WebSocketConfigSchema,
+});
+
+const SocketIOInstanceSchema = z.object({
+  protocol: z.literal("socket.io"),
+  config: SocketIOConfigSchema,
+});
+
+const WebRTCInstanceSchema = z.object({
+  protocol: z.literal("webrtc"),
+  config: WebRTCConfigSchema,
+});
+
+const GraphQLInstanceSchema = z.object({
+  protocol: z.literal("graphql"),
+  config: GraphQLConfigSchema,
+});
+
+const GrpcInstanceSchema = z.object({
+  protocol: z.literal("grpc"),
+  config: GrpcConfigSchema,
+});
+
+const SSEInstanceSchema = z.object({
+  protocol: z.literal("sse"),
+  config: SSEConfigSchema,
+});
+
+const WebhookInstanceSchema = z.object({
+  protocol: z.literal("webhook"),
+  config: WebhookConfigSchema,
+});
+
+export const RealtimeInstanceSchema = z.discriminatedUnion("protocol", [
+  WebSocketInstanceSchema,
+  SocketIOInstanceSchema,
+  WebRTCInstanceSchema,
+]);
+
+export const ApiInstanceSchema = z.discriminatedUnion("protocol", [
+  GraphQLInstanceSchema,
+  GrpcInstanceSchema,
+  SSEInstanceSchema,
+  WebhookInstanceSchema,
+]);
+
+export const NonRestInstanceSchema = z.discriminatedUnion("protocol", [
+  WebSocketInstanceSchema,
+  SocketIOInstanceSchema,
+  WebRTCInstanceSchema,
+  GraphQLInstanceSchema,
+  GrpcInstanceSchema,
+  SSEInstanceSchema,
+  WebhookInstanceSchema,
+]);
+
 export const ApiBindingSchema = z.object({
   kind: z.literal("api_binding"),
   id: z.string(),
   label: z.string(),
   description: z.string().optional(),
 
-  // API Type
-  apiType: z.enum(["openapi", "asyncapi"]),
+  // Primitive protocol
+  protocol: ApiProtocolSchema,
+  // Legacy compatibility with existing data model
+  apiType: z.enum(["openapi", "asyncapi"]).optional(),
+  // Strict instance union (non-REST protocols)
+  instance: NonRestInstanceSchema.optional(),
 
   // Route Definition
-  method: HttpMethodSchema,
-  route: z.string(),
+  method: HttpMethodSchema.optional(),
+  route: z.string().optional(),
 
   // Request Schema
-  request: RequestSchema,
+  request: RequestSchema.optional(),
 
   // Response Schemas
-  responses: z.object({
-    success: ResponseSchema,
-    error: ResponseSchema,
-  }),
+  responses: z
+    .object({
+      success: ResponseSchema,
+      error: ResponseSchema,
+    })
+    .optional(),
 
   // Security
-  security: SecuritySchemeSchema,
+  security: SecuritySchemeSchema.optional(),
 
   // Rate Limiting
-  rateLimit: RateLimitSchema,
+  rateLimit: RateLimitSchema.optional(),
 
   // Versioning
   version: z.string(),
@@ -440,6 +615,118 @@ export const ApiBindingSchema = z.object({
 
   // Process Reference
   processRef: z.string(),
+}).superRefine((value, ctx) => {
+  const isRealtime =
+    value.protocol === "ws" ||
+    value.protocol === "socket.io" ||
+    value.protocol === "webrtc";
+  const isAdditionalInstanceProtocol =
+    value.protocol === "graphql" ||
+    value.protocol === "grpc" ||
+    value.protocol === "sse" ||
+    value.protocol === "webhook";
+
+  if (value.protocol === "rest") {
+    if (!value.method || !value.route || !value.request || !value.responses) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "REST protocol requires method, route, request, and responses",
+      });
+    }
+    if (!value.security || !value.rateLimit) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "REST protocol requires security and rateLimit",
+      });
+    }
+    if (value.instance) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "REST protocol cannot include instance config",
+      });
+    }
+    return;
+  }
+
+  if (!isRealtime && !isAdditionalInstanceProtocol) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Unsupported protocol",
+    });
+    return;
+  }
+
+  if (!value.instance) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Non-REST protocols require an instance config",
+    });
+    return;
+  }
+
+  if (value.instance.protocol !== value.protocol) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Protocol must match instance protocol",
+    });
+  }
+
+  if (
+    value.method ||
+    value.route ||
+    value.request ||
+    value.responses ||
+    value.security ||
+    value.rateLimit
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        "Non-REST protocols cannot include REST method/route/request/response/security/rateLimit fields",
+    });
+  }
+
+  if (value.protocol === "webrtc") {
+    const signaling = value.instance.protocol === "webrtc"
+      ? value.instance.config.signalingTransportRef
+      : "";
+    if (!signaling || signaling.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "WebRTC requires signalingTransportRef",
+      });
+    }
+  }
+
+  if (value.protocol === "graphql" && value.instance.protocol === "graphql") {
+    if (!value.instance.config.schemaSDL.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "GraphQL requires schemaSDL",
+      });
+    }
+  }
+
+  if (value.protocol === "grpc" && value.instance.protocol === "grpc") {
+    if (!value.instance.config.protobufDefinition.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "gRPC requires protobufDefinition",
+      });
+    }
+    if (!value.instance.config.service.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "gRPC requires service",
+      });
+    }
+    if (value.instance.config.rpcMethods.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "gRPC requires at least one RPC method",
+      });
+    }
+  }
 });
 
 // ============================================
@@ -477,6 +764,16 @@ export type InfraResourceType = z.infer<typeof InfraResourceTypeSchema>;
 export type InfraProvider = z.infer<typeof InfraProviderSchema>;
 export type InfraEnvironment = z.infer<typeof InfraEnvironmentSchema>;
 export type ApiBinding = z.infer<typeof ApiBindingSchema>;
+export type ApiInstance = z.infer<typeof ApiInstanceSchema>;
+export type NonRestInstance = z.infer<typeof NonRestInstanceSchema>;
+export type RealtimeInstance = z.infer<typeof RealtimeInstanceSchema>;
+export type WebSocketConfig = z.infer<typeof WebSocketConfigSchema>;
+export type SocketIOConfig = z.infer<typeof SocketIOConfigSchema>;
+export type WebRTCConfig = z.infer<typeof WebRTCConfigSchema>;
+export type GraphQLConfig = z.infer<typeof GraphQLConfigSchema>;
+export type GrpcConfig = z.infer<typeof GrpcConfigSchema>;
+export type SSEConfig = z.infer<typeof SSEConfigSchema>;
+export type WebhookConfig = z.infer<typeof WebhookConfigSchema>;
 export type InputField = z.infer<typeof InputFieldSchema>;
 export type OutputField = z.infer<typeof OutputFieldSchema>;
 export type ProcessStep = z.infer<typeof ProcessStepSchema>;

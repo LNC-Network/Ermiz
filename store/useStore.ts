@@ -25,11 +25,14 @@ type NodeKind =
   | "database"
   | "queue"
   | "api_binding"
-  | "api_get"
-  | "api_post"
-  | "api_put"
-  | "api_delete"
-  | "api_patch"
+  | "api_rest"
+  | "api_ws"
+  | "api_socketio"
+  | "api_webrtc"
+  | "api_graphql"
+  | "api_grpc"
+  | "api_sse"
+  | "api_webhook"
   | "infra_ec2"
   | "infra_lambda"
   | "infra_eks"
@@ -41,7 +44,13 @@ type NodeKind =
 
 type GraphPreset = "empty" | "hello_world_api";
 
-type WorkspaceTab = "api" | "infra" | "database" | "agent" | "deploy";
+type WorkspaceTab =
+  | "api"
+  | "infra"
+  | "database"
+  | "functions"
+  | "agent"
+  | "deploy";
 
 type GraphState = {
   nodes: Node[];
@@ -100,6 +109,7 @@ const graphPresets: Record<GraphPreset, { nodes: Node[]; edges: Edge[] }> = {
           kind: "api_binding",
           id: "helloWorldApi",
           label: "Hello World API",
+          protocol: "rest",
           apiType: "openapi",
           method: "GET",
           route: "/api/hello",
@@ -131,8 +141,8 @@ const graphPresets: Record<GraphPreset, { nodes: Node[]; edges: Edge[] }> = {
         data: {
           kind: "process",
           id: "helloWorldProcess",
-          label: "Hello World Process",
-          processType: "calculation",
+          label: "Function Block",
+          processType: "function_block",
           execution: "sync",
           description: "Produces a simple hello-world response",
           inputs: [],
@@ -167,6 +177,7 @@ const initialGraphs: Record<WorkspaceTab, GraphState> = {
   api: cloneGraph(graphPresets.hello_world_api),
   infra: cloneGraph(graphPresets.empty),
   database: cloneGraph(graphPresets.empty),
+  functions: cloneGraph(graphPresets.empty),
   agent: cloneGraph(graphPresets.empty),
   deploy: cloneGraph(graphPresets.empty),
 };
@@ -244,6 +255,26 @@ export const useStore = create<RFState>((set, get) => {
 
     addNode: (kind: NodeKind, customPosition?: { x: number; y: number }) => {
       const nodes = get().nodes;
+      const activeTab = get().activeTab;
+      if (activeTab === "functions" && kind !== "process") {
+        return;
+      }
+      if (kind === "process" && activeTab === "api") {
+        const existingApiProcess = nodes.find((node) => {
+          const nodeData = node.data as NodeData;
+          return nodeData.kind === "process";
+        });
+        if (existingApiProcess) {
+          updateActiveGraph({
+            nodes: nodes.map((node) => ({
+              ...node,
+              selected: node.id === existingApiProcess.id,
+            })),
+          });
+          return;
+        }
+      }
+
       const id = `node-${Date.now()}`;
       const lastNode = nodes[nodes.length - 1];
       const position =
@@ -258,8 +289,8 @@ export const useStore = create<RFState>((set, get) => {
           data: {
             kind: "process",
             id: `process_${Date.now()}`,
-            label: "New Process",
-            processType: "calculation",
+            label: "Function Block",
+            processType: "function_block",
             execution: "sync",
             description: "",
             inputs: [],
@@ -305,7 +336,8 @@ export const useStore = create<RFState>((set, get) => {
           data: {
             kind: "api_binding",
             id: `api_${Date.now()}`,
-            label: "New API Endpoint",
+            label: "REST Interface",
+            protocol: "rest",
             apiType: "openapi",
             method: "GET",
             route: "/api/resource",
@@ -343,12 +375,13 @@ export const useStore = create<RFState>((set, get) => {
             description: "",
           },
         },
-        api_get: {
+        api_rest: {
           type: "api_binding",
           data: {
             kind: "api_binding",
-            id: `api_get_${Date.now()}`,
-            label: "GET Endpoint",
+            id: `api_rest_${Date.now()}`,
+            label: "REST Interface",
+            protocol: "rest",
             apiType: "openapi",
             method: "GET",
             route: "/api/resource",
@@ -370,114 +403,181 @@ export const useStore = create<RFState>((set, get) => {
             description: "",
           },
         },
-        api_post: {
+        api_ws: {
           type: "api_binding",
           data: {
             kind: "api_binding",
-            id: `api_post_${Date.now()}`,
-            label: "POST Endpoint",
-            apiType: "openapi",
-            method: "POST",
-            route: "/api/resource",
-            request: {
-              pathParams: [],
-              queryParams: [],
-              headers: [],
-              body: { contentType: "application/json", schema: [] },
+            id: `api_ws_${Date.now()}`,
+            label: "WS Interface",
+            protocol: "ws",
+            apiType: "asyncapi",
+            instance: {
+              protocol: "ws",
+              config: {
+                endpoint: "/ws/events",
+                pingIntervalSec: 20,
+                pingTimeoutSec: 10,
+                maxMessageSizeKb: 256,
+                maxConnections: 5000,
+                auth: { type: "none", scopes: [] },
+                rateLimit: { enabled: false, requests: 100, window: "minute" },
+              },
             },
-            responses: {
-              success: { statusCode: 201, schema: [] },
-              error: { statusCode: 400, schema: [] },
-            },
-            security: { type: "none", scopes: [] },
-            rateLimit: { enabled: false, requests: 100, window: "minute" },
             version: "v1",
             deprecated: false,
             processRef: "",
-            description: "",
+            description: "WebSocket interface",
           },
         },
-        api_put: {
+        api_socketio: {
           type: "api_binding",
           data: {
             kind: "api_binding",
-            id: `api_put_${Date.now()}`,
-            label: "PUT Endpoint",
-            apiType: "openapi",
-            method: "PUT",
-            route: "/api/resource/:id",
-            request: {
-              pathParams: [],
-              queryParams: [],
-              headers: [],
-              body: { contentType: "application/json", schema: [] },
+            id: `api_socketio_${Date.now()}`,
+            label: "Socket.IO Interface",
+            protocol: "socket.io",
+            apiType: "asyncapi",
+            instance: {
+              protocol: "socket.io",
+              config: {
+                endpoint: "/socket.io",
+                namespaces: ["/"],
+                rooms: [],
+                events: [],
+                ackTimeoutMs: 5000,
+                auth: { type: "none", scopes: [] },
+                rateLimit: { enabled: false, requests: 100, window: "minute" },
+              },
             },
-            responses: {
-              success: { statusCode: 200, schema: [] },
-              error: { statusCode: 400, schema: [] },
-            },
-            security: { type: "none", scopes: [] },
-            rateLimit: { enabled: false, requests: 100, window: "minute" },
             version: "v1",
             deprecated: false,
             processRef: "",
-            description: "",
+            description: "Socket.IO interface",
           },
         },
-        api_delete: {
+        api_webrtc: {
           type: "api_binding",
           data: {
             kind: "api_binding",
-            id: `api_delete_${Date.now()}`,
-            label: "DELETE Endpoint",
-            apiType: "openapi",
-            method: "DELETE",
-            route: "/api/resource/:id",
-            request: {
-              pathParams: [],
-              queryParams: [],
-              headers: [],
-              body: { contentType: "application/json", schema: [] },
+            id: `api_webrtc_${Date.now()}`,
+            label: "WebRTC Interface",
+            protocol: "webrtc",
+            apiType: "asyncapi",
+            instance: {
+              protocol: "webrtc",
+              config: {
+                signalingTransportRef: "api_ws_signaling",
+                stunServers: ["stun:stun.l.google.com:19302"],
+                turnServers: [],
+                peerLimit: 4,
+                topology: "p2p",
+              },
             },
-            responses: {
-              success: { statusCode: 204, schema: [] },
-              error: { statusCode: 404, schema: [] },
-            },
-            security: { type: "none", scopes: [] },
-            rateLimit: { enabled: false, requests: 100, window: "minute" },
             version: "v1",
             deprecated: false,
             processRef: "",
-            description: "",
+            description: "WebRTC interface",
           },
         },
-      api_patch: {
-        type: "api_binding",
-        data: {
+        api_graphql: {
+          type: "api_binding",
+          data: {
             kind: "api_binding",
-            id: `api_patch_${Date.now()}`,
-            label: "PATCH Endpoint",
-            apiType: "openapi",
-            method: "PATCH",
-            route: "/api/resource/:id",
-            request: {
-              pathParams: [],
-              queryParams: [],
-              headers: [],
-              body: { contentType: "application/json", schema: [] },
+            id: `api_graphql_${Date.now()}`,
+            label: "GraphQL Interface",
+            protocol: "graphql",
+            instance: {
+              protocol: "graphql",
+              config: {
+                endpoint: "/graphql",
+                schemaSDL: "type Query { health: String! }",
+                operations: {
+                  queries: true,
+                  mutations: true,
+                  subscriptions: true,
+                },
+              },
             },
-            responses: {
-              success: { statusCode: 200, schema: [] },
-              error: { statusCode: 400, schema: [] },
-            },
-            security: { type: "none", scopes: [] },
-            rateLimit: { enabled: false, requests: 100, window: "minute" },
             version: "v1",
             deprecated: false,
             processRef: "",
-            description: "",
+            description: "GraphQL interface",
+          },
         },
-      },
+        api_grpc: {
+          type: "api_binding",
+          data: {
+            kind: "api_binding",
+            id: `api_grpc_${Date.now()}`,
+            label: "gRPC Interface",
+            protocol: "grpc",
+            instance: {
+              protocol: "grpc",
+              config: {
+                protobufDefinition:
+                  "syntax = \"proto3\";\nservice ApiService { rpc Execute (ExecuteRequest) returns (ExecuteResponse); }\nmessage ExecuteRequest { string id = 1; }\nmessage ExecuteResponse { string status = 1; }",
+                service: "ApiService",
+                rpcMethods: [{ name: "Execute", type: "unary" }],
+              },
+            },
+            version: "v1",
+            deprecated: false,
+            processRef: "",
+            description: "gRPC interface",
+          },
+        },
+        api_sse: {
+          type: "api_binding",
+          data: {
+            kind: "api_binding",
+            id: `api_sse_${Date.now()}`,
+            label: "SSE Interface",
+            protocol: "sse",
+            instance: {
+              protocol: "sse",
+              config: {
+                endpoint: "/events",
+                eventName: "update",
+                retryMs: 5000,
+                heartbeatSec: 30,
+                direction: "server_to_client",
+              },
+            },
+            version: "v1",
+            deprecated: false,
+            processRef: "",
+            description: "Server-Sent Events interface",
+          },
+        },
+        api_webhook: {
+          type: "api_binding",
+          data: {
+            kind: "api_binding",
+            id: `api_webhook_${Date.now()}`,
+            label: "Webhook Interface",
+            protocol: "webhook",
+            instance: {
+              protocol: "webhook",
+              config: {
+                endpoint: "/webhooks/incoming",
+                signatureVerification: {
+                  enabled: true,
+                  headerName: "X-Signature",
+                  secretRef: "WEBHOOK_SECRET",
+                },
+                retryPolicy: {
+                  enabled: true,
+                  maxAttempts: 5,
+                  backoff: "exponential",
+                },
+              },
+            },
+            version: "v1",
+            deprecated: false,
+            processRef: "",
+            description: "Incoming webhook callback interface",
+          },
+        },
       infra_ec2: {
         type: "infra",
         data: {
