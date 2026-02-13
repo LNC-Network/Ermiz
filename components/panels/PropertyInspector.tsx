@@ -25,6 +25,7 @@ import {
   getDatabaseTemplateById,
 } from "@/lib/templates/database-templates";
 import { estimateDatabaseMonthlyCost } from "@/lib/cost-estimator";
+import { DatabaseERDViewer } from "./DatabaseERDViewer";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -214,6 +215,7 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
     Record<number, boolean>
   >({});
   const [isMonitoringExpanded, setIsMonitoringExpanded] = useState(true);
+  const [showERD, setShowERD] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(
     databaseTemplates[0]?.id || "",
   );
@@ -823,22 +825,46 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                   <span style={{ fontSize: 11, color: "var(--muted)" }}>
                     {((nodeData as DatabaseBlock).tables || []).length} tables
                   </span>
-                  <button
-                    type="button"
-                    onClick={addTable}
-                    style={{
-                      border: "1px solid var(--border)",
-                      background: "var(--floating)",
-                      color: "var(--foreground)",
-                      borderRadius: 4,
-                      padding: "4px 8px",
-                      fontSize: 11,
-                      cursor: "pointer",
-                    }}
-                  >
-                    + Table
-                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowERD((prev) => !prev)}
+                      style={{
+                        border: "1px solid var(--border)",
+                        background: showERD ? "color-mix(in srgb, var(--primary) 18%, var(--floating) 82%)" : "var(--floating)",
+                        color: "var(--foreground)",
+                        borderRadius: 4,
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {showERD ? "Hide ERD" : "View ERD"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addTable}
+                      style={{
+                        border: "1px solid var(--border)",
+                        background: "var(--floating)",
+                        color: "var(--foreground)",
+                        borderRadius: 4,
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      + Table
+                    </button>
+                  </div>
                 </div>
+
+                {showERD && (
+                  <DatabaseERDViewer
+                    tables={(nodeData as DatabaseBlock).tables || []}
+                    relationships={(nodeData as DatabaseBlock).relationships || []}
+                  />
+                )}
 
                 {((nodeData as DatabaseBlock).tables || []).length === 0 && (
                   <div style={{ fontSize: 11, color: "var(--muted)" }}>
