@@ -76,7 +76,12 @@ export default function Home() {
         savedTab === "agent" ||
         savedTab === "deploy"
       ) {
-        setActiveTab(savedTab);
+        const frame = window.requestAnimationFrame(() => {
+          setActiveTab(savedTab);
+        });
+        return () => {
+          window.cancelAnimationFrame(frame);
+        };
       }
     }
   }, []);

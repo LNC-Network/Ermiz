@@ -109,23 +109,31 @@ export function WorkspaceCanvas({
     // Load saved widths and collapsed states from localStorage after mount
     if (typeof window !== "undefined") {
       const isNarrow = window.matchMedia("(max-width: 1024px)").matches;
-      
+
       const savedLeftCollapsed = localStorage.getItem(STORAGE_KEYS.leftSidebarCollapsed);
       const savedRightCollapsed = localStorage.getItem(STORAGE_KEYS.rightSidebarCollapsed);
-      
-      if (isNarrow) {
-        setIsLeftSidebarCollapsed(true);
-        setIsInspectorCollapsed(true);
-      } else {
-        if (savedLeftCollapsed === "1") setIsLeftSidebarCollapsed(true);
-        if (savedRightCollapsed === "1") setIsInspectorCollapsed(true);
-      }
-      
+
+      const nextLeftCollapsed = isNarrow ? true : savedLeftCollapsed === "1";
+      const nextInspectorCollapsed = isNarrow ? true : savedRightCollapsed === "1";
       const storedLeftWidth = Number(localStorage.getItem(STORAGE_KEYS.leftSidebarWidth));
-      if (storedLeftWidth) setLeftSidebarWidth(clampLeftWidth(storedLeftWidth));
-      
+      const nextLeftWidth = storedLeftWidth
+        ? clampLeftWidth(storedLeftWidth)
+        : DEFAULT_LEFT_WIDTH;
       const storedInspectorWidth = Number(localStorage.getItem(STORAGE_KEYS.inspectorWidth));
-      if (storedInspectorWidth) setInspectorWidth(clampInspectorWidth(storedInspectorWidth));
+      const nextInspectorWidth = storedInspectorWidth
+        ? clampInspectorWidth(storedInspectorWidth)
+        : DEFAULT_INSPECTOR_WIDTH;
+
+      const frame = window.requestAnimationFrame(() => {
+        setIsLeftSidebarCollapsed(nextLeftCollapsed);
+        setIsInspectorCollapsed(nextInspectorCollapsed);
+        setLeftSidebarWidth(nextLeftWidth);
+        setInspectorWidth(nextInspectorWidth);
+      });
+
+      return () => {
+        window.cancelAnimationFrame(frame);
+      };
     }
   }, []);
 
