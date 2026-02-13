@@ -100,6 +100,7 @@ export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
     monitoring.thresholds.queryLatencyMs !== 250 ||
     monitoring.slaTargets.uptimePercent !== 99.9 ||
     monitoring.slaTargets.maxLatencyMs !== 300;
+  const hasSeeds = (dbData.seeds || []).length > 0;
 
   return (
     <div
@@ -144,6 +145,9 @@ export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
         </span>
         {monitoringConfigured && (
           <span style={{ fontSize: 11, color: "rgba(255,255,255,0.92)" }}>📊</span>
+        )}
+        {hasSeeds && (
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.92)" }}>🌱</span>
         )}
         {dbData.engine && (
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>

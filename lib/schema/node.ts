@@ -285,6 +285,12 @@ export const DatabaseQueryOperationSchema = z.enum([
   "DELETE",
 ]);
 
+export const DatabaseSeedStrategySchema = z.enum([
+  "random",
+  "fixture",
+  "custom",
+]);
+
 export const DatabaseQuerySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -301,6 +307,14 @@ export const DatabaseMigrationSchema = z.object({
   upScript: z.string().default(""),
   downScript: z.string().default(""),
   applied: z.boolean().default(false),
+});
+
+export const DatabaseSeedSchema = z.object({
+  tableName: z.string(),
+  rowCount: z.number().default(10),
+  strategy: DatabaseSeedStrategySchema.default("random"),
+  fixtureData: z.array(z.record(z.string(), z.unknown())).default([]),
+  customScript: z.string().default(""),
 });
 
 export const DatabaseTableFieldSchema = z.object({
@@ -395,6 +409,7 @@ export const DatabaseBlockSchema = z.object({
   schemas: z.array(z.string()).default([]),
   tables: z.array(DatabaseTableSchema).default([]),
   queries: z.array(DatabaseQuerySchema).default([]),
+  seeds: z.array(DatabaseSeedSchema).default([]),
   migrations: z.array(DatabaseMigrationSchema).default([]),
   relationships: z.array(DatabaseRelationshipSchema).default([]),
   queryWorkbench: DatabaseQueryWorkbenchSchema.default({
@@ -705,6 +720,8 @@ export type DatabaseFieldType = z.infer<typeof DatabaseFieldTypeSchema>;
 export type DatabaseRelationType = z.infer<typeof DatabaseRelationTypeSchema>;
 export type DatabaseQuery = z.infer<typeof DatabaseQuerySchema>;
 export type DatabaseQueryOperation = z.infer<typeof DatabaseQueryOperationSchema>;
+export type DatabaseSeed = z.infer<typeof DatabaseSeedSchema>;
+export type DatabaseSeedStrategy = z.infer<typeof DatabaseSeedStrategySchema>;
 export type DatabaseMigration = z.infer<typeof DatabaseMigrationSchema>;
 export type DatabaseOrmTarget = z.infer<typeof DatabaseOrmTargetSchema>;
 export type DatabaseQueryWorkbench = z.infer<typeof DatabaseQueryWorkbenchSchema>;

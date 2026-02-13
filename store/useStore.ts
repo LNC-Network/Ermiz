@@ -351,6 +351,7 @@ export const useStore = create<RFState>((set, get) => {
             schemas: [],
             tables: [],
             queries: [],
+            seeds: [],
             migrations: [],
             relationships: [],
             queryWorkbench: {
