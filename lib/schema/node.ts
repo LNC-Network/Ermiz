@@ -189,6 +189,46 @@ export const DatabasePerformanceSchema = z.object({
   }),
 });
 
+export const DatabaseBackupSchema = z.object({
+  schedule: z.string().default(""),
+  retention: z.object({
+    days: z.number().default(7),
+    maxVersions: z.number().default(30),
+  }),
+  pointInTimeRecovery: z.boolean().default(false),
+  multiRegion: z.object({
+    enabled: z.boolean().default(false),
+    regions: z.array(z.string()).default([]),
+  }),
+});
+
+export const DatabaseCostEstimationSchema = z.object({
+  storageGb: z.number().default(0),
+  estimatedIOPS: z.number().default(0),
+  backupSizeGb: z.number().default(0),
+  replicaCount: z.number().default(0),
+});
+
+export const DatabaseSecuritySchema = z.object({
+  roles: z
+    .array(
+      z.object({
+        name: z.string(),
+        permissions: z.array(z.string()).default([]),
+      }),
+    )
+    .default([]),
+  encryption: z.object({
+    atRest: z.boolean().default(false),
+    inTransit: z.boolean().default(false),
+  }),
+  network: z.object({
+    vpcId: z.string().default(""),
+    allowedIPs: z.array(z.string()).default([]),
+  }),
+  auditLogging: z.boolean().default(false),
+});
+
 export const DatabaseOrmTargetSchema = z.enum([
   "prisma",
   "typeorm",
@@ -287,6 +327,25 @@ export const DatabaseBlockSchema = z.object({
     caching: { enabled: false, strategy: "", ttl: 300 },
     sharding: { enabled: false, strategy: "", partitionKey: "" },
   }),
+  backup: DatabaseBackupSchema.default({
+    schedule: "",
+    retention: { days: 7, maxVersions: 30 },
+    pointInTimeRecovery: false,
+    multiRegion: { enabled: false, regions: [] },
+  }),
+  costEstimation: DatabaseCostEstimationSchema.default({
+    storageGb: 0,
+    estimatedIOPS: 0,
+    backupSizeGb: 0,
+    replicaCount: 0,
+  }),
+  security: DatabaseSecuritySchema.default({
+    roles: [],
+    encryption: { atRest: false, inTransit: false },
+    network: { vpcId: "", allowedIPs: [] },
+    auditLogging: false,
+  }),
+  loadedTemplate: z.string().optional(),
   schemas: z.array(z.string()).default([]),
   tables: z.array(DatabaseTableSchema).default([]),
   queries: z.array(DatabaseQuerySchema).default([]),

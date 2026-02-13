@@ -18,6 +18,11 @@ import {
 } from "@/lib/schema/node";
 import { TypeSchemaEditor } from "./TypeSchemaEditor";
 import { QueryEditor } from "./QueryEditor";
+import {
+  databaseTemplates,
+  getDatabaseTemplateById,
+} from "@/lib/templates/database-templates";
+import { estimateDatabaseMonthlyCost } from "@/lib/cost-estimator";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -195,6 +200,16 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
   const [expandedTables, setExpandedTables] = useState<Record<number, boolean>>(
     {},
   );
+  const [isBackupExpanded, setIsBackupExpanded] = useState(true);
+  const [backupRegionDraft, setBackupRegionDraft] = useState("");
+  const [isSecurityExpanded, setIsSecurityExpanded] = useState(true);
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(
+    databaseTemplates[0]?.id || "",
+  );
+  const [roleNameDraft, setRoleNameDraft] = useState("");
+  const [rolePermDraft, setRolePermDraft] = useState("");
+  const [allowedIpDraft, setAllowedIpDraft] = useState("");
   const [requestTab, setRequestTab] = useState<"body" | "headers" | "query">(
     "body",
   );
@@ -256,6 +271,31 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
       caching: { enabled: false, strategy: "", ttl: 300 },
       sharding: { enabled: false, strategy: "", partitionKey: "" },
     };
+  const databaseBackup =
+    databaseNodeData?.backup || {
+      schedule: "",
+      retention: { days: 7, maxVersions: 30 },
+      pointInTimeRecovery: false,
+      multiRegion: { enabled: false, regions: [] },
+    };
+  const databaseSecurity =
+    databaseNodeData?.security || {
+      roles: [],
+      encryption: { atRest: false, inTransit: false },
+      network: { vpcId: "", allowedIPs: [] },
+      auditLogging: false,
+    };
+  const databaseCostEstimation =
+    databaseNodeData?.costEstimation || {
+      storageGb: 0,
+      estimatedIOPS: 0,
+      backupSizeGb: 0,
+      replicaCount: 0,
+    };
+  const databaseMonthlyCost = estimateDatabaseMonthlyCost(
+    databaseNodeData?.engine,
+    databaseCostEstimation,
+  );
 
   const updateDatabaseTables = (tables: DatabaseTable[]) => {
     if (!databaseNodeData) return;
@@ -276,6 +316,59 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
         indexes: [],
       },
     ]);
+  };
+
+  const loadDatabaseTemplate = () => {
+    if (!databaseNodeData) return;
+    const template = getDatabaseTemplateById(selectedTemplateId);
+    if (!template) return;
+
+    const stamp = `${selectedTemplateId}_template`;
+    const tableIdMap = new Map<string, string>();
+    const fieldIdMap = new Map<string, string>();
+
+    const clonedTables = template.tables.map((table) => {
+      const nextTableId = `${table.id || table.name}_${stamp}`;
+      if (table.id) {
+        tableIdMap.set(table.id, nextTableId);
+      }
+      const fields = (table.fields || []).map((field) => {
+        const nextFieldId = `${field.id || `${table.name}_${field.name}`}_${stamp}`;
+        if (field.id) {
+          fieldIdMap.set(field.id, nextFieldId);
+        }
+        return {
+          ...field,
+          id: nextFieldId,
+        };
+      });
+      return {
+        ...table,
+        id: nextTableId,
+        fields,
+      };
+    });
+
+    const clonedRelationships = (template.relationships || []).map((relationship) => ({
+      ...relationship,
+      id: `${relationship.id}_${stamp}`,
+      fromTableId: tableIdMap.get(relationship.fromTableId) || relationship.fromTableId,
+      toTableId: tableIdMap.get(relationship.toTableId) || relationship.toTableId,
+      fromFieldId: relationship.fromFieldId
+        ? fieldIdMap.get(relationship.fromFieldId) || relationship.fromFieldId
+        : undefined,
+      toFieldId: relationship.toFieldId
+        ? fieldIdMap.get(relationship.toFieldId) || relationship.toFieldId
+        : undefined,
+    }));
+
+    handleUpdate({
+      tables: clonedTables,
+      relationships: clonedRelationships,
+      schemas: clonedTables.map((table) => table.name),
+      loadedTemplate: template.label,
+    } as Partial<DatabaseBlock>);
+    setIsTemplatePickerOpen(false);
   };
 
   return (
@@ -628,6 +721,65 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
           </div>
 
           <div style={sectionStyle}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: isTemplatePickerOpen ? 8 : 0,
+              }}
+            >
+              <div style={labelStyle}>Templates</div>
+              <button
+                type="button"
+                onClick={() => setIsTemplatePickerOpen((prev) => !prev)}
+                style={{
+                  border: "1px solid var(--border)",
+                  background: "var(--floating)",
+                  color: "var(--foreground)",
+                  borderRadius: 4,
+                  padding: "4px 8px",
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                Load Template
+              </button>
+            </div>
+
+            {isTemplatePickerOpen && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 6 }}>
+                <select
+                  value={selectedTemplateId}
+                  onChange={(e) => setSelectedTemplateId(e.target.value)}
+                  style={selectStyle}
+                >
+                  {databaseTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={loadDatabaseTemplate}
+                  style={{
+                    border: "1px solid var(--border)",
+                    background: "var(--floating)",
+                    color: "var(--foreground)",
+                    borderRadius: 4,
+                    padding: "4px 10px",
+                    fontSize: 11,
+                    cursor: "pointer",
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div style={sectionStyle}>
             <div style={labelStyle}>Performance & Scaling</div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
@@ -838,6 +990,569 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                 style={inputStyle}
               />
             </div>
+          </div>
+
+          <div style={sectionStyle}>
+            <div style={labelStyle}>Resource Planning</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+              <input
+                type="number"
+                min={0}
+                value={databaseCostEstimation.storageGb}
+                onChange={(e) =>
+                  handleUpdate({
+                    costEstimation: {
+                      ...databaseCostEstimation,
+                      storageGb: Math.max(0, Number(e.target.value) || 0),
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Storage (GB)"
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                min={0}
+                value={databaseCostEstimation.estimatedIOPS}
+                onChange={(e) =>
+                  handleUpdate({
+                    costEstimation: {
+                      ...databaseCostEstimation,
+                      estimatedIOPS: Math.max(0, Number(e.target.value) || 0),
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Estimated IOPS"
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                min={0}
+                value={databaseCostEstimation.backupSizeGb}
+                onChange={(e) =>
+                  handleUpdate({
+                    costEstimation: {
+                      ...databaseCostEstimation,
+                      backupSizeGb: Math.max(0, Number(e.target.value) || 0),
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Backup Size (GB)"
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                min={0}
+                value={databaseCostEstimation.replicaCount}
+                onChange={(e) =>
+                  handleUpdate({
+                    costEstimation: {
+                      ...databaseCostEstimation,
+                      replicaCount: Math.max(0, Number(e.target.value) || 0),
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Replica Count"
+                style={inputStyle}
+              />
+            </div>
+            <div
+              style={{
+                marginTop: 8,
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                background: "var(--panel)",
+                padding: "8px 10px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                Estimated Monthly Cost ({databaseMonthlyCost.provider.toUpperCase()})
+              </span>
+              <span style={{ fontSize: 14, color: "var(--secondary)", fontWeight: 600 }}>
+                {databaseMonthlyCost.formattedMonthlyEstimate}
+              </span>
+            </div>
+          </div>
+
+          <div style={sectionStyle}>
+            <button
+              type="button"
+              onClick={() => setIsBackupExpanded((prev) => !prev)}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--muted)",
+                padding: 0,
+                cursor: "pointer",
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: isBackupExpanded ? 8 : 0,
+              }}
+            >
+              <span>{isBackupExpanded ? "▾" : "▸"}</span>
+              <span>Backup & Recovery</span>
+            </button>
+
+            {isBackupExpanded && (
+              <div style={{ display: "grid", gap: 6 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                  <select
+                    value={databaseBackup.schedule}
+                    onChange={(e) =>
+                      handleUpdate({
+                        backup: {
+                          ...databaseBackup,
+                          schedule: e.target.value,
+                        },
+                      } as Partial<DatabaseBlock>)
+                    }
+                    style={selectStyle}
+                  >
+                    <option value="">Schedule</option>
+                    <option value="hourly">hourly</option>
+                    <option value="daily">daily</option>
+                    <option value="weekly">weekly</option>
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    value={databaseBackup.retention.days}
+                    onChange={(e) =>
+                      handleUpdate({
+                        backup: {
+                          ...databaseBackup,
+                          retention: {
+                            ...databaseBackup.retention,
+                            days: Math.max(1, Number(e.target.value) || 1),
+                          },
+                        },
+                      } as Partial<DatabaseBlock>)
+                    }
+                    placeholder="Retention Days"
+                    style={inputStyle}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={databaseBackup.retention.maxVersions}
+                    onChange={(e) =>
+                      handleUpdate({
+                        backup: {
+                          ...databaseBackup,
+                          retention: {
+                            ...databaseBackup.retention,
+                            maxVersions: Math.max(1, Number(e.target.value) || 1),
+                          },
+                        },
+                      } as Partial<DatabaseBlock>)
+                    }
+                    placeholder="Max Versions"
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={databaseBackup.pointInTimeRecovery}
+                      onChange={(e) =>
+                        handleUpdate({
+                          backup: {
+                            ...databaseBackup,
+                            pointInTimeRecovery: e.target.checked,
+                          },
+                        } as Partial<DatabaseBlock>)
+                      }
+                    />
+                    Point-in-time Recovery
+                  </label>
+                  <label style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={databaseBackup.multiRegion.enabled}
+                      onChange={(e) =>
+                        handleUpdate({
+                          backup: {
+                            ...databaseBackup,
+                            multiRegion: {
+                              ...databaseBackup.multiRegion,
+                              enabled: e.target.checked,
+                            },
+                          },
+                        } as Partial<DatabaseBlock>)
+                      }
+                    />
+                    Multi-region DR
+                  </label>
+                </div>
+
+                {databaseBackup.multiRegion.enabled && (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input
+                        type="text"
+                        value={backupRegionDraft}
+                        onChange={(e) => setBackupRegionDraft(e.target.value)}
+                        placeholder="Add region (e.g. us-west-2)"
+                        style={{ ...inputStyle, flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const region = backupRegionDraft.trim();
+                          if (!region) return;
+                          if (databaseBackup.multiRegion.regions.includes(region)) {
+                            setBackupRegionDraft("");
+                            return;
+                          }
+                          handleUpdate({
+                            backup: {
+                              ...databaseBackup,
+                              multiRegion: {
+                                ...databaseBackup.multiRegion,
+                                regions: [...databaseBackup.multiRegion.regions, region],
+                              },
+                            },
+                          } as Partial<DatabaseBlock>);
+                          setBackupRegionDraft("");
+                        }}
+                        style={{
+                          border: "1px solid var(--border)",
+                          background: "var(--floating)",
+                          color: "var(--foreground)",
+                          borderRadius: 4,
+                          padding: "4px 8px",
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Add
+                      </button>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {(databaseBackup.multiRegion.regions || []).map((region) => (
+                        <button
+                          key={region}
+                          type="button"
+                          onClick={() =>
+                            handleUpdate({
+                              backup: {
+                                ...databaseBackup,
+                                multiRegion: {
+                                  ...databaseBackup.multiRegion,
+                                  regions: databaseBackup.multiRegion.regions.filter(
+                                    (value) => value !== region,
+                                  ),
+                                },
+                              },
+                            } as Partial<DatabaseBlock>)
+                          }
+                          style={{
+                            border: "1px solid var(--border)",
+                            background: "var(--panel)",
+                            color: "var(--secondary)",
+                            borderRadius: 999,
+                            padding: "2px 8px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {region} ×
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={sectionStyle}>
+            <button
+              type="button"
+              onClick={() => setIsSecurityExpanded((prev) => !prev)}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "var(--muted)",
+                padding: 0,
+                cursor: "pointer",
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: isSecurityExpanded ? 8 : 0,
+              }}
+            >
+              <span>{isSecurityExpanded ? "▾" : "▸"}</span>
+              <span>Security</span>
+            </button>
+
+            {isSecurityExpanded && (
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase" }}>
+                    Roles & Permissions
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      type="text"
+                      value={roleNameDraft}
+                      onChange={(e) => setRoleNameDraft(e.target.value)}
+                      placeholder="Role name"
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                    <input
+                      type="text"
+                      value={rolePermDraft}
+                      onChange={(e) => setRolePermDraft(e.target.value)}
+                      placeholder="read, write, delete"
+                      style={{ ...inputStyle, flex: 1.3 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const roleName = roleNameDraft.trim();
+                        if (!roleName) return;
+                        const permissions = rolePermDraft
+                          .split(",")
+                          .map((perm) => perm.trim())
+                          .filter(Boolean);
+                        handleUpdate({
+                          security: {
+                            ...databaseSecurity,
+                            roles: [
+                              ...(databaseSecurity.roles || []),
+                              { name: roleName, permissions },
+                            ],
+                          },
+                        } as Partial<DatabaseBlock>);
+                        setRoleNameDraft("");
+                        setRolePermDraft("");
+                      }}
+                      style={{
+                        border: "1px solid var(--border)",
+                        background: "var(--floating)",
+                        color: "var(--foreground)",
+                        borderRadius: 4,
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div style={{ display: "grid", gap: 4 }}>
+                    {(databaseSecurity.roles || []).map((role, index) => (
+                      <div
+                        key={`${role.name}-${index}`}
+                        style={{
+                          border: "1px solid var(--border)",
+                          borderRadius: 4,
+                          background: "var(--panel)",
+                          padding: "5px 8px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 11, color: "var(--foreground)" }}>{role.name}</span>
+                        <span style={{ fontSize: 11, color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {(role.permissions || []).join(", ") || "no permissions"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleUpdate({
+                              security: {
+                                ...databaseSecurity,
+                                roles: (databaseSecurity.roles || []).filter(
+                                  (_, i) => i !== index,
+                                ),
+                              },
+                            } as Partial<DatabaseBlock>)
+                          }
+                          style={{
+                            marginLeft: "auto",
+                            border: "1px solid var(--border)",
+                            background: "transparent",
+                            color: "var(--muted)",
+                            borderRadius: 4,
+                            padding: "2px 6px",
+                            fontSize: 11,
+                            cursor: "pointer",
+                          }}
+                        >
+                          x
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={databaseSecurity.encryption.atRest}
+                      onChange={(e) =>
+                        handleUpdate({
+                          security: {
+                            ...databaseSecurity,
+                            encryption: {
+                              ...databaseSecurity.encryption,
+                              atRest: e.target.checked,
+                            },
+                          },
+                        } as Partial<DatabaseBlock>)
+                      }
+                    />
+                    Encryption at rest
+                  </label>
+                  <label style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={databaseSecurity.encryption.inTransit}
+                      onChange={(e) =>
+                        handleUpdate({
+                          security: {
+                            ...databaseSecurity,
+                            encryption: {
+                              ...databaseSecurity.encryption,
+                              inTransit: e.target.checked,
+                            },
+                          },
+                        } as Partial<DatabaseBlock>)
+                      }
+                    />
+                    Encryption in transit
+                  </label>
+                  <label style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={databaseSecurity.auditLogging}
+                      onChange={(e) =>
+                        handleUpdate({
+                          security: {
+                            ...databaseSecurity,
+                            auditLogging: e.target.checked,
+                          },
+                        } as Partial<DatabaseBlock>)
+                      }
+                    />
+                    Audit logging
+                  </label>
+                </div>
+
+                <div style={{ display: "grid", gap: 6 }}>
+                  <input
+                    type="text"
+                    value={databaseSecurity.network.vpcId}
+                    onChange={(e) =>
+                      handleUpdate({
+                        security: {
+                          ...databaseSecurity,
+                          network: {
+                            ...databaseSecurity.network,
+                            vpcId: e.target.value,
+                          },
+                        },
+                      } as Partial<DatabaseBlock>)
+                    }
+                    placeholder="VPC ID"
+                    style={inputStyle}
+                  />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      type="text"
+                      value={allowedIpDraft}
+                      onChange={(e) => setAllowedIpDraft(e.target.value)}
+                      placeholder="Add allowed IP/CIDR"
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const value = allowedIpDraft.trim();
+                        if (!value) return;
+                        if ((databaseSecurity.network.allowedIPs || []).includes(value)) {
+                          setAllowedIpDraft("");
+                          return;
+                        }
+                        handleUpdate({
+                          security: {
+                            ...databaseSecurity,
+                            network: {
+                              ...databaseSecurity.network,
+                              allowedIPs: [
+                                ...(databaseSecurity.network.allowedIPs || []),
+                                value,
+                              ],
+                            },
+                          },
+                        } as Partial<DatabaseBlock>);
+                        setAllowedIpDraft("");
+                      }}
+                      style={{
+                        border: "1px solid var(--border)",
+                        background: "var(--floating)",
+                        color: "var(--foreground)",
+                        borderRadius: 4,
+                        padding: "4px 8px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {(databaseSecurity.network.allowedIPs || []).map((ip) => (
+                      <button
+                        key={ip}
+                        type="button"
+                        onClick={() =>
+                          handleUpdate({
+                            security: {
+                              ...databaseSecurity,
+                              network: {
+                                ...databaseSecurity.network,
+                                allowedIPs: (databaseSecurity.network.allowedIPs || []).filter(
+                                  (value) => value !== ip,
+                                ),
+                              },
+                            },
+                          } as Partial<DatabaseBlock>)
+                        }
+                        style={{
+                          border: "1px solid var(--border)",
+                          background: "var(--panel)",
+                          color: "var(--secondary)",
+                          borderRadius: 999,
+                          padding: "2px 8px",
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {ip} ×
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={sectionStyle}>

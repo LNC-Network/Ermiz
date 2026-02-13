@@ -1,6 +1,7 @@
 import React, { memo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { DatabaseBlock } from "@/lib/schema/node";
+import { estimateDatabaseMonthlyCost } from "@/lib/cost-estimator";
 
 export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   const dbData = data as unknown as DatabaseBlock;
@@ -26,6 +27,37 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
     performance.readReplicas.count > 0 ||
     performance.caching.enabled ||
     performance.sharding.enabled;
+  const backup = dbData.backup || {
+    schedule: "",
+    retention: { days: 7, maxVersions: 30 },
+    pointInTimeRecovery: false,
+    multiRegion: { enabled: false, regions: [] },
+  };
+  const backupConfigured =
+    Boolean(backup.schedule) ||
+    backup.pointInTimeRecovery ||
+    (backup.multiRegion.enabled && backup.multiRegion.regions.length > 0);
+  const security = dbData.security || {
+    roles: [],
+    encryption: { atRest: false, inTransit: false },
+    network: { vpcId: "", allowedIPs: [] },
+    auditLogging: false,
+  };
+  const encryptionEnabled =
+    security.encryption.atRest || security.encryption.inTransit;
+  const loadedTemplate = dbData.loadedTemplate || "";
+  const costEstimation = dbData.costEstimation || {
+    storageGb: 0,
+    estimatedIOPS: 0,
+    backupSizeGb: 0,
+    replicaCount: 0,
+  };
+  const costEstimate = estimateDatabaseMonthlyCost(dbData.engine, costEstimation);
+  const costConfigured =
+    costEstimation.storageGb > 0 ||
+    costEstimation.estimatedIOPS > 0 ||
+    costEstimation.backupSizeGb > 0 ||
+    costEstimation.replicaCount > 0;
 
   return (
     <div
@@ -65,6 +97,9 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
         >
           {dbData.dbType.toUpperCase()}
         </span>
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.92)" }}>
+          {encryptionEnabled ? "🔒" : "🔓"}
+        </span>
         {dbData.engine && (
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>
             {dbData.engine}
@@ -82,6 +117,19 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
             }}
           >
             PERF
+          </span>
+        )}
+        {backupConfigured && (
+          <span
+            style={{
+              border: "1px solid rgba(255,255,255,0.35)",
+              borderRadius: 999,
+              padding: "1px 6px",
+              fontSize: 9,
+              color: "rgba(255,255,255,0.9)",
+            }}
+          >
+            BACKUP
           </span>
         )}
       </div>
@@ -105,6 +153,21 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
         {dbData.description && (
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
             {dbData.description}
+          </div>
+        )}
+        {loadedTemplate && (
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 10,
+              color: "var(--secondary)",
+              border: "1px solid var(--border)",
+              borderRadius: 999,
+              padding: "2px 8px",
+              display: "inline-flex",
+            }}
+          >
+            Template: {loadedTemplate}
           </div>
         )}
       </div>
@@ -199,12 +262,28 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
           borderTop: "1px solid var(--border)",
           display: "flex",
           justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
           fontSize: 10,
           color: "var(--muted)",
         }}
       >
         <span>Tables: {dbData.tables?.length || 0}</span>
         <span>Relations: {dbData.relationships?.length || 0}</span>
+        {costConfigured && (
+          <span
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 999,
+              padding: "1px 7px",
+              color: "var(--muted)",
+              background: "var(--floating)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {costEstimate.formattedMonthlyEstimate}
+          </span>
+        )}
       </div>
 
       {/* Handles */}

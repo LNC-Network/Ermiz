@@ -305,6 +305,36 @@ export const useStore = create<RFState>((set, get) => {
                 partitionKey: "",
               },
             },
+            backup: {
+              schedule: "",
+              retention: {
+                days: 7,
+                maxVersions: 30,
+              },
+              pointInTimeRecovery: false,
+              multiRegion: {
+                enabled: false,
+                regions: [],
+              },
+            },
+            costEstimation: {
+              storageGb: 0,
+              estimatedIOPS: 0,
+              backupSizeGb: 0,
+              replicaCount: 0,
+            },
+            security: {
+              roles: [],
+              encryption: {
+                atRest: false,
+                inTransit: false,
+              },
+              network: {
+                vpcId: "",
+                allowedIPs: [],
+              },
+              auditLogging: false,
+            },
             schemas: [],
             tables: [],
             queries: [],
