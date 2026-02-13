@@ -17,6 +17,7 @@ import {
   OutputField,
 } from "@/lib/schema/node";
 import { TypeSchemaEditor } from "./TypeSchemaEditor";
+import { QueryEditor } from "./QueryEditor";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -248,6 +249,13 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
 
   const databaseNodeData =
     kind === "database" ? (nodeData as DatabaseBlock) : null;
+  const databasePerformance =
+    databaseNodeData?.performance || {
+      connectionPool: { min: 2, max: 20, timeout: 30 },
+      readReplicas: { count: 0, regions: [] },
+      caching: { enabled: false, strategy: "", ttl: 300 },
+      sharding: { enabled: false, strategy: "", partitionKey: "" },
+    };
 
   const updateDatabaseTables = (tables: DatabaseTable[]) => {
     if (!databaseNodeData) return;
@@ -617,6 +625,228 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                 </label>
               ),
             )}
+          </div>
+
+          <div style={sectionStyle}>
+            <div style={labelStyle}>Performance & Scaling</div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+              <input
+                type="number"
+                min={0}
+                value={databasePerformance.connectionPool.min}
+                onChange={(e) =>
+                  handleUpdate({
+                    performance: {
+                      ...databasePerformance,
+                      connectionPool: {
+                        ...databasePerformance.connectionPool,
+                        min: Math.max(0, Number(e.target.value) || 0),
+                      },
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Pool Min"
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                min={1}
+                value={databasePerformance.connectionPool.max}
+                onChange={(e) =>
+                  handleUpdate({
+                    performance: {
+                      ...databasePerformance,
+                      connectionPool: {
+                        ...databasePerformance.connectionPool,
+                        max: Math.max(1, Number(e.target.value) || 1),
+                      },
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Pool Max"
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                min={0}
+                value={databasePerformance.connectionPool.timeout}
+                onChange={(e) =>
+                  handleUpdate({
+                    performance: {
+                      ...databasePerformance,
+                      connectionPool: {
+                        ...databasePerformance.connectionPool,
+                        timeout: Math.max(0, Number(e.target.value) || 0),
+                      },
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Pool Timeout"
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 6 }}>
+              <input
+                type="number"
+                min={0}
+                value={databasePerformance.readReplicas.count}
+                onChange={(e) =>
+                  handleUpdate({
+                    performance: {
+                      ...databasePerformance,
+                      readReplicas: {
+                        ...databasePerformance.readReplicas,
+                        count: Math.max(0, Number(e.target.value) || 0),
+                      },
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Read Replicas"
+                style={inputStyle}
+              />
+              <input
+                type="text"
+                value={(databasePerformance.readReplicas.regions || []).join(", ")}
+                onChange={(e) =>
+                  handleUpdate({
+                    performance: {
+                      ...databasePerformance,
+                      readReplicas: {
+                        ...databasePerformance.readReplicas,
+                        regions: e.target.value
+                          .split(",")
+                          .map((region) => region.trim())
+                          .filter(Boolean),
+                      },
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Replica regions"
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: 6, marginTop: 6, alignItems: "center" }}>
+              <label style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={databasePerformance.caching.enabled}
+                  onChange={(e) =>
+                    handleUpdate({
+                      performance: {
+                        ...databasePerformance,
+                        caching: {
+                          ...databasePerformance.caching,
+                          enabled: e.target.checked,
+                        },
+                      },
+                    } as Partial<DatabaseBlock>)
+                  }
+                />
+                Cache
+              </label>
+              <input
+                type="text"
+                value={databasePerformance.caching.strategy}
+                onChange={(e) =>
+                  handleUpdate({
+                    performance: {
+                      ...databasePerformance,
+                      caching: {
+                        ...databasePerformance.caching,
+                        strategy: e.target.value,
+                      },
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Caching strategy"
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                min={0}
+                value={databasePerformance.caching.ttl}
+                onChange={(e) =>
+                  handleUpdate({
+                    performance: {
+                      ...databasePerformance,
+                      caching: {
+                        ...databasePerformance.caching,
+                        ttl: Math.max(0, Number(e.target.value) || 0),
+                      },
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Cache TTL"
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: 6, marginTop: 6, alignItems: "center" }}>
+              <label style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="checkbox"
+                  checked={databasePerformance.sharding.enabled}
+                  onChange={(e) =>
+                    handleUpdate({
+                      performance: {
+                        ...databasePerformance,
+                        sharding: {
+                          ...databasePerformance.sharding,
+                          enabled: e.target.checked,
+                        },
+                      },
+                    } as Partial<DatabaseBlock>)
+                  }
+                />
+                Shard
+              </label>
+              <input
+                type="text"
+                value={databasePerformance.sharding.strategy}
+                onChange={(e) =>
+                  handleUpdate({
+                    performance: {
+                      ...databasePerformance,
+                      sharding: {
+                        ...databasePerformance.sharding,
+                        strategy: e.target.value,
+                      },
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Sharding strategy"
+                style={inputStyle}
+              />
+              <input
+                type="text"
+                value={databasePerformance.sharding.partitionKey}
+                onChange={(e) =>
+                  handleUpdate({
+                    performance: {
+                      ...databasePerformance,
+                      sharding: {
+                        ...databasePerformance.sharding,
+                        partitionKey: e.target.value,
+                      },
+                    },
+                  } as Partial<DatabaseBlock>)
+                }
+                placeholder="Partition key"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          <div style={sectionStyle}>
+            <QueryEditor
+              database={nodeData as DatabaseBlock}
+              onChange={(queries) =>
+                handleUpdate({ queries } as Partial<DatabaseBlock>)
+              }
+            />
           </div>
 
           <div style={sectionStyle}>

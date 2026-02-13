@@ -16,6 +16,16 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   const enabledCapabilities = Object.entries(dbData.capabilities)
     .filter(([, enabled]) => enabled)
     .map(([name]) => name);
+  const performance = dbData.performance || {
+    connectionPool: { min: 2, max: 20, timeout: 30 },
+    readReplicas: { count: 0, regions: [] },
+    caching: { enabled: false, strategy: "", ttl: 300 },
+    sharding: { enabled: false, strategy: "", partitionKey: "" },
+  };
+  const advancedPerformanceEnabled =
+    performance.readReplicas.count > 0 ||
+    performance.caching.enabled ||
+    performance.sharding.enabled;
 
   return (
     <div
@@ -58,6 +68,20 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
         {dbData.engine && (
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>
             {dbData.engine}
+          </span>
+        )}
+        {advancedPerformanceEnabled && (
+          <span
+            style={{
+              marginLeft: "auto",
+              border: "1px solid rgba(255,255,255,0.35)",
+              borderRadius: 999,
+              padding: "1px 6px",
+              fontSize: 9,
+              color: "rgba(255,255,255,0.9)",
+            }}
+          >
+            PERF
           </span>
         )}
       </div>

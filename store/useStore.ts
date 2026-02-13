@@ -284,8 +284,30 @@ export const useStore = create<RFState>((set, get) => {
               constraints: false,
               pagination: true,
             },
+            performance: {
+              connectionPool: {
+                min: 2,
+                max: 20,
+                timeout: 30,
+              },
+              readReplicas: {
+                count: 0,
+                regions: [],
+              },
+              caching: {
+                enabled: false,
+                strategy: "",
+                ttl: 300,
+              },
+              sharding: {
+                enabled: false,
+                strategy: "",
+                partitionKey: "",
+              },
+            },
             schemas: [],
             tables: [],
+            queries: [],
             relationships: [],
             queryWorkbench: {
               query: "",

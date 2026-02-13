@@ -167,6 +167,28 @@ export const DatabaseCapabilitiesSchema = z.object({
   pagination: z.boolean(),
 });
 
+export const DatabasePerformanceSchema = z.object({
+  connectionPool: z.object({
+    min: z.number().default(2),
+    max: z.number().default(20),
+    timeout: z.number().default(30),
+  }),
+  readReplicas: z.object({
+    count: z.number().default(0),
+    regions: z.array(z.string()).default([]),
+  }),
+  caching: z.object({
+    enabled: z.boolean().default(false),
+    strategy: z.string().default(""),
+    ttl: z.number().default(300),
+  }),
+  sharding: z.object({
+    enabled: z.boolean().default(false),
+    strategy: z.string().default(""),
+    partitionKey: z.string().default(""),
+  }),
+});
+
 export const DatabaseOrmTargetSchema = z.enum([
   "prisma",
   "typeorm",
@@ -191,6 +213,22 @@ export const DatabaseRelationTypeSchema = z.enum([
   "one_to_many",
   "many_to_many",
 ]);
+
+export const DatabaseQueryOperationSchema = z.enum([
+  "SELECT",
+  "INSERT",
+  "UPDATE",
+  "DELETE",
+]);
+
+export const DatabaseQuerySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  operation: DatabaseQueryOperationSchema,
+  target: z.string(),
+  conditions: z.string().default(""),
+  generatedCode: z.string().default(""),
+});
 
 export const DatabaseTableFieldSchema = z.object({
   id: z.string().optional(),
@@ -243,8 +281,15 @@ export const DatabaseBlockSchema = z.object({
   dbType: DatabaseTypeSchema,
   engine: z.string().optional(),
   capabilities: DatabaseCapabilitiesSchema,
+  performance: DatabasePerformanceSchema.default({
+    connectionPool: { min: 2, max: 20, timeout: 30 },
+    readReplicas: { count: 0, regions: [] },
+    caching: { enabled: false, strategy: "", ttl: 300 },
+    sharding: { enabled: false, strategy: "", partitionKey: "" },
+  }),
   schemas: z.array(z.string()).default([]),
   tables: z.array(DatabaseTableSchema).default([]),
+  queries: z.array(DatabaseQuerySchema).default([]),
   relationships: z.array(DatabaseRelationshipSchema).default([]),
   queryWorkbench: DatabaseQueryWorkbenchSchema.default({
     query: "",
@@ -552,6 +597,8 @@ export type DatabaseTableField = z.infer<typeof DatabaseTableFieldSchema>;
 export type DatabaseRelationship = z.infer<typeof DatabaseRelationshipSchema>;
 export type DatabaseFieldType = z.infer<typeof DatabaseFieldTypeSchema>;
 export type DatabaseRelationType = z.infer<typeof DatabaseRelationTypeSchema>;
+export type DatabaseQuery = z.infer<typeof DatabaseQuerySchema>;
+export type DatabaseQueryOperation = z.infer<typeof DatabaseQueryOperationSchema>;
 export type DatabaseOrmTarget = z.infer<typeof DatabaseOrmTargetSchema>;
 export type DatabaseQueryWorkbench = z.infer<typeof DatabaseQueryWorkbenchSchema>;
 export type QueueBlock = z.infer<typeof QueueBlockSchema>;
