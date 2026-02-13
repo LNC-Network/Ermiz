@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { supabaseClient } from "@/lib/supabase/client";
@@ -41,7 +42,7 @@ export default function MasterPage() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
-  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const [user, setUser] = useState<{
     email?: string | null;
     user_metadata?: Record<string, unknown> | null;
@@ -69,10 +70,6 @@ export default function MasterPage() {
   }, []);
 
   useEffect(() => {
-    setAvatarFailed(false);
-  }, [user?.user_metadata, user?.email, user?.identities]);
-
-  useEffect(() => {
     let isMounted = true;
     const loadUser = async () => {
       try {
@@ -80,12 +77,19 @@ export default function MasterPage() {
         if (!isMounted) return;
         if (error) {
           setUser(null);
+          setIsProfileOpen(false);
           return;
         }
         setUser(data.user ?? null);
+        if (data.user) {
+          setIsLoginOpen(false);
+        } else {
+          setIsProfileOpen(false);
+        }
       } catch {
         if (!isMounted) return;
         setUser(null);
+        setIsProfileOpen(false);
       }
     };
 
@@ -93,6 +97,11 @@ export default function MasterPage() {
 
     const { data } = supabaseClient.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        setIsLoginOpen(false);
+      } else {
+        setIsProfileOpen(false);
+      }
     });
 
     return () => {
@@ -100,14 +109,6 @@ export default function MasterPage() {
       data.subscription.unsubscribe();
     };
   }, []);
-
-  useEffect(() => {
-    if (!user) {
-      setIsProfileOpen(false);
-    } else {
-      setIsLoginOpen(false);
-    }
-  }, [user]);
 
   const handleSaveChanges = () => {
     router.push("/studio");
@@ -167,6 +168,7 @@ export default function MasterPage() {
     (typeof identityData.avatar_url === "string" && identityData.avatar_url) ||
     (typeof identityData.picture === "string" && identityData.picture) ||
     "";
+  const avatarFailed = Boolean(avatarUrl) && failedAvatarUrl === avatarUrl;
   const initials =
     displayName
       .split(" ")
@@ -211,10 +213,13 @@ export default function MasterPage() {
                 }}
               >
                 {avatarUrl && !avatarFailed ? (
-                  <img
+                  <Image
                     src={avatarUrl}
                     alt={displayName}
-                    onError={() => setAvatarFailed(true)}
+                    width={34}
+                    height={34}
+                    unoptimized
+                    onError={() => setFailedAvatarUrl(avatarUrl)}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 ) : (

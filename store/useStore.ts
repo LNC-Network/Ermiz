@@ -384,6 +384,38 @@ export const useStore = create<RFState>((set, get) => {
                 maxLatencyMs: 300,
               },
             },
+            environments: {
+              dev: {
+                connectionString: "",
+                provider: {
+                  region: "",
+                },
+                performanceTier: "small",
+                overrides: {
+                  enabled: false,
+                },
+              },
+              staging: {
+                connectionString: "",
+                provider: {
+                  region: "",
+                },
+                performanceTier: "medium",
+                overrides: {
+                  enabled: false,
+                },
+              },
+              production: {
+                connectionString: "",
+                provider: {
+                  region: "",
+                },
+                performanceTier: "large",
+                overrides: {
+                  enabled: false,
+                },
+              },
+            },
             schemas: [],
             tables: [],
             queries: [],

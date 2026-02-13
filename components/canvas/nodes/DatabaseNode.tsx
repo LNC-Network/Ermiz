@@ -101,6 +101,21 @@ export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
     monitoring.slaTargets.uptimePercent !== 99.9 ||
     monitoring.slaTargets.maxLatencyMs !== 300;
   const hasSeeds = (dbData.seeds || []).length > 0;
+  const environmentKeys = ["dev", "staging", "production"] as const;
+  const configuredEnvironmentCount = environmentKeys.reduce((count, envKey) => {
+    const environmentData = (dbData.environments?.[envKey] || {}) as {
+      connectionString?: string;
+      provider?: { region?: string };
+      region?: string;
+      overrides?: { enabled?: boolean };
+    };
+    const region = environmentData.provider?.region || environmentData.region || "";
+    const isConfigured =
+      Boolean(environmentData.connectionString) ||
+      Boolean(region) ||
+      Boolean(environmentData.overrides?.enabled);
+    return count + (isConfigured ? 1 : 0);
+  }, 0);
 
   return (
     <div
@@ -179,6 +194,19 @@ export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
             }}
           >
             BACKUP
+          </span>
+        )}
+        {configuredEnvironmentCount > 0 && (
+          <span
+            style={{
+              border: "1px solid rgba(255,255,255,0.35)",
+              borderRadius: 999,
+              padding: "1px 6px",
+              fontSize: 9,
+              color: "rgba(255,255,255,0.9)",
+            }}
+          >
+            {configuredEnvironmentCount} envs
           </span>
         )}
       </div>

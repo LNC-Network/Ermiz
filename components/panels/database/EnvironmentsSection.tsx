@@ -39,6 +39,59 @@ type EnvironmentsSectionProps = {
   sectionStyle: React.CSSProperties;
 };
 
+const defaultEnvironments: DatabaseBlock["environments"] = {
+  dev: {
+    connectionString: "",
+    provider: { region: "" },
+    performanceTier: "small",
+    overrides: { enabled: false },
+  },
+  staging: {
+    connectionString: "",
+    provider: { region: "" },
+    performanceTier: "medium",
+    overrides: { enabled: false },
+  },
+  production: {
+    connectionString: "",
+    provider: { region: "" },
+    performanceTier: "large",
+    overrides: { enabled: false },
+  },
+};
+
+const normalizeEnvironmentConfig = (
+  raw: Record<string, unknown> | undefined,
+  fallback: DatabaseBlock["environments"][DatabaseEnvironmentKey],
+) => {
+  const provider = (raw?.provider as Record<string, unknown> | undefined) || {};
+  const legacyRegion = typeof raw?.region === "string" ? raw.region : "";
+  return {
+    connectionString:
+      typeof raw?.connectionString === "string" ? raw.connectionString : fallback.connectionString,
+    provider: {
+      region: typeof provider.region === "string" ? provider.region : legacyRegion || fallback.provider.region,
+    },
+    performanceTier:
+      raw?.performanceTier === "small" || raw?.performanceTier === "medium" || raw?.performanceTier === "large"
+        ? raw.performanceTier
+        : fallback.performanceTier,
+    overrides:
+      typeof raw?.overrides === "object" && raw.overrides
+        ? {
+            enabled: Boolean((raw.overrides as Record<string, unknown>).enabled),
+            performance: (raw.overrides as Record<string, unknown>).performance as
+              | DatabaseBlock["performance"]
+              | undefined,
+            backup: (raw.overrides as Record<string, unknown>).backup as DatabaseBlock["backup"] | undefined,
+            monitoring: (raw.overrides as Record<string, unknown>).monitoring as
+              | DatabaseBlock["monitoring"]
+              | undefined,
+          }
+        : fallback.overrides,
+  };
+};
+
 export function EnvironmentsSection({
   database,
   onChange,
@@ -50,27 +103,20 @@ export function EnvironmentsSection({
   const [activeTab, setActiveTab] = useState<DatabaseEnvironmentKey>("dev");
 
   const environments = useMemo(
-    () =>
-      database.environments || {
-        dev: {
-          connectionString: "",
-          region: "",
-          performanceTier: "small" as const,
-          overrides: { enabled: false },
-        },
-        staging: {
-          connectionString: "",
-          region: "",
-          performanceTier: "medium" as const,
-          overrides: { enabled: false },
-        },
-        production: {
-          connectionString: "",
-          region: "",
-          performanceTier: "large" as const,
-          overrides: { enabled: false },
-        },
-      },
+    () => ({
+      dev: normalizeEnvironmentConfig(
+        database.environments?.dev as unknown as Record<string, unknown> | undefined,
+        defaultEnvironments.dev,
+      ),
+      staging: normalizeEnvironmentConfig(
+        database.environments?.staging as unknown as Record<string, unknown> | undefined,
+        defaultEnvironments.staging,
+      ),
+      production: normalizeEnvironmentConfig(
+        database.environments?.production as unknown as Record<string, unknown> | undefined,
+        defaultEnvironments.production,
+      ),
+    }),
     [database.environments],
   );
   const activeEnvironment = environments[activeTab];
@@ -143,7 +189,7 @@ export function EnvironmentsSection({
               const envConfig = environments[env];
               const isConfigured =
                 Boolean(envConfig.connectionString) ||
-                Boolean(envConfig.region) ||
+                Boolean(envConfig.provider.region) ||
                 Boolean(envConfig.overrides?.enabled);
               return (
                 <button
@@ -229,11 +275,14 @@ export function EnvironmentsSection({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               <input
                 type="text"
-                value={activeEnvironment.region}
+                value={activeEnvironment.provider.region}
                 onChange={(e) =>
                   updateEnvironmentConfig(activeTab, (current) => ({
                     ...current,
-                    region: e.target.value,
+                    provider: {
+                      ...current.provider,
+                      region: e.target.value,
+                    },
                   }))
                 }
                 placeholder="Provider region"
@@ -331,4 +380,3 @@ export function EnvironmentsSection({
     </div>
   );
 }
-

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // CommonJS version to avoid ESM warnings without setting "type": "module"
 // Uses DIRECT_URL from .env to test connectivity.
 const { Client } = require("pg");

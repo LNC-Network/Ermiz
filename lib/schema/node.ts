@@ -260,9 +260,15 @@ export const DatabaseEnvironmentOverrideSchema = z.object({
   monitoring: DatabaseMonitoringSchema.optional(),
 });
 
+export const DatabaseEnvironmentProviderSchema = z.object({
+  region: z.string().default(""),
+});
+
 export const DatabaseEnvironmentConfigSchema = z.object({
   connectionString: z.string().default(""),
-  region: z.string().default(""),
+  provider: DatabaseEnvironmentProviderSchema.default({
+    region: "",
+  }),
   performanceTier: DatabaseEnvironmentTierSchema.default("small"),
   overrides: DatabaseEnvironmentOverrideSchema.default({
     enabled: false,
@@ -272,19 +278,25 @@ export const DatabaseEnvironmentConfigSchema = z.object({
 export const DatabaseEnvironmentsSchema = z.object({
   dev: DatabaseEnvironmentConfigSchema.default({
     connectionString: "",
-    region: "",
+    provider: {
+      region: "",
+    },
     performanceTier: "small",
     overrides: { enabled: false },
   }),
   staging: DatabaseEnvironmentConfigSchema.default({
     connectionString: "",
-    region: "",
+    provider: {
+      region: "",
+    },
     performanceTier: "medium",
     overrides: { enabled: false },
   }),
   production: DatabaseEnvironmentConfigSchema.default({
     connectionString: "",
-    region: "",
+    provider: {
+      region: "",
+    },
     performanceTier: "large",
     overrides: { enabled: false },
   }),
@@ -454,7 +466,32 @@ export const DatabaseBlockSchema = z.object({
       maxLatencyMs: 300,
     },
   }),
-  environments: DatabaseEnvironmentsSchema.optional(),
+  environments: DatabaseEnvironmentsSchema.default({
+    dev: {
+      connectionString: "",
+      provider: {
+        region: "",
+      },
+      performanceTier: "small",
+      overrides: { enabled: false },
+    },
+    staging: {
+      connectionString: "",
+      provider: {
+        region: "",
+      },
+      performanceTier: "medium",
+      overrides: { enabled: false },
+    },
+    production: {
+      connectionString: "",
+      provider: {
+        region: "",
+      },
+      performanceTier: "large",
+      overrides: { enabled: false },
+    },
+  }),
   loadedTemplate: z.string().optional(),
   schemas: z.array(z.string()).default([]),
   tables: z.array(DatabaseTableSchema).default([]),

@@ -469,6 +469,79 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
         const relationshipsCandidate = parsed.relationships;
         const seedsCandidate = parsed.seeds;
         const environmentsCandidate = parsed.environments;
+        const defaultEnvironmentsCandidate = {
+          dev: {
+            connectionString: "",
+            provider: {
+              region: "",
+            },
+            performanceTier: "small",
+            overrides: { enabled: false },
+          },
+          staging: {
+            connectionString: "",
+            provider: {
+              region: "",
+            },
+            performanceTier: "medium",
+            overrides: { enabled: false },
+          },
+          production: {
+            connectionString: "",
+            provider: {
+              region: "",
+            },
+            performanceTier: "large",
+            overrides: { enabled: false },
+          },
+        };
+        const normalizeEnvironmentCandidate = (
+          envRaw: unknown,
+          fallback: (typeof defaultEnvironmentsCandidate)["dev"],
+        ) => {
+          const envRecord = (envRaw || {}) as Record<string, unknown>;
+          const provider = (envRecord.provider || {}) as Record<string, unknown>;
+          return {
+            connectionString:
+              typeof envRecord.connectionString === "string"
+                ? envRecord.connectionString
+                : fallback.connectionString,
+            provider: {
+              region:
+                typeof provider.region === "string"
+                  ? provider.region
+                  : typeof envRecord.region === "string"
+                    ? envRecord.region
+                    : fallback.provider.region,
+            },
+            performanceTier:
+              envRecord.performanceTier === "small" ||
+              envRecord.performanceTier === "medium" ||
+              envRecord.performanceTier === "large"
+                ? envRecord.performanceTier
+                : fallback.performanceTier,
+            overrides:
+              typeof envRecord.overrides === "object" && envRecord.overrides
+                ? envRecord.overrides
+                : fallback.overrides,
+          };
+        };
+        const normalizedEnvironmentsCandidate = {
+          dev: normalizeEnvironmentCandidate(
+            (environmentsCandidate as Record<string, unknown> | undefined)?.dev,
+            defaultEnvironmentsCandidate.dev,
+          ),
+          staging: normalizeEnvironmentCandidate(
+            (environmentsCandidate as Record<string, unknown> | undefined)
+              ?.staging,
+            defaultEnvironmentsCandidate.staging,
+          ),
+          production: normalizeEnvironmentCandidate(
+            (environmentsCandidate as Record<string, unknown> | undefined)
+              ?.production,
+            defaultEnvironmentsCandidate.production,
+          ),
+        };
         const tableValidation = DatabaseTableSchema.array().safeParse(
           tablesCandidate,
         );
@@ -494,26 +567,7 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
           return;
         }
         const environmentValidation = DatabaseEnvironmentsSchema.safeParse(
-          environmentsCandidate || {
-            dev: {
-              connectionString: "",
-              region: "",
-              performanceTier: "small",
-              overrides: { enabled: false },
-            },
-            staging: {
-              connectionString: "",
-              region: "",
-              performanceTier: "medium",
-              overrides: { enabled: false },
-            },
-            production: {
-              connectionString: "",
-              region: "",
-              performanceTier: "large",
-              overrides: { enabled: false },
-            },
-          },
+          normalizedEnvironmentsCandidate,
         );
         if (!environmentValidation.success) {
           showSchemaToast("Invalid schema: environments validation failed.", "error");

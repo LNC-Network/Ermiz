@@ -2,7 +2,6 @@ import React from "react";
 import { BaseEdge, EdgeProps, getSmoothStepPath } from "@xyflow/react";
 
 export function StepEdge({
-  id,
   sourceX,
   sourceY,
   targetX,

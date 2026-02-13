@@ -5,15 +5,17 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { ensureUser } from "@/lib/credit";
 
+const tabEnum = z.enum([
+  "api",
+  "process",
+  "infrastructure",
+  "schema",
+  "requestTab",
+  "other",
+]);
+
 const createSchema = z.object({
-  tab: z.enum([
-    "api",
-    "process",
-    "infrastructure",
-    "schema",
-    "requestTab",
-    "other",
-  ]),
+  tab: tabEnum,
   name: z.string().min(1),
 });
 
@@ -27,12 +29,13 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const tab = searchParams.get("tab");
-  if (tab && !createSchema.shape.tab.options.includes(tab as any)) {
+  const parsedTab = tab ? tabEnum.safeParse(tab) : null;
+  if (tab && !parsedTab?.success) {
     return NextResponse.json({ error: "invalid tab" }, { status: 400 });
   }
 
   const sets = await prisma.documentSet.findMany({
-    where: { userId: user.id, tab: tab ? (tab as any) : undefined },
+    where: { userId: user.id, tab: parsedTab?.success ? parsedTab.data : undefined },
     include: { documents: true },
   });
 

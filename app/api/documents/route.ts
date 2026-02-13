@@ -17,8 +17,8 @@ const tabEnum = z.enum([
 const createSchema = z.object({
   tab: tabEnum,
   title: z.string().min(1),
-  content: z.any(),
-  metadata: z.record(z.any()).optional(),
+  content: z.unknown(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   documentSetId: z.string().optional(),
 });
 
@@ -32,14 +32,15 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const tabParam = searchParams.get("tab");
-  if (tabParam && !tabEnum.options.includes(tabParam as any)) {
+  const parsedTab = tabParam ? tabEnum.safeParse(tabParam) : null;
+  if (tabParam && !parsedTab?.success) {
     return NextResponse.json({ error: "invalid tab" }, { status: 400 });
   }
 
   const documents = await prisma.document.findMany({
     where: {
       userId: user.id,
-      tab: tabParam ? (tabParam as any) : undefined,
+      tab: parsedTab?.success ? parsedTab.data : undefined,
     },
     orderBy: { updatedAt: "desc" },
   });
