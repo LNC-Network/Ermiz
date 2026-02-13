@@ -285,6 +285,13 @@ export const useStore = create<RFState>((set, get) => {
               pagination: true,
             },
             schemas: [],
+            tables: [],
+            relationships: [],
+            queryWorkbench: {
+              query: "",
+              ormTarget: "prisma",
+              mockRows: 5,
+            },
             description: "",
           },
         },

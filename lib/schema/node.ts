@@ -167,6 +167,75 @@ export const DatabaseCapabilitiesSchema = z.object({
   pagination: z.boolean(),
 });
 
+export const DatabaseOrmTargetSchema = z.enum([
+  "prisma",
+  "typeorm",
+  "mongoose",
+]);
+
+export const DatabaseFieldTypeSchema = z.enum([
+  "string",
+  "text",
+  "int",
+  "bigint",
+  "float",
+  "decimal",
+  "boolean",
+  "datetime",
+  "json",
+  "uuid",
+]);
+
+export const DatabaseRelationTypeSchema = z.enum([
+  "one_to_one",
+  "one_to_many",
+  "many_to_many",
+]);
+
+export const DatabaseTableFieldSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  type: DatabaseFieldTypeSchema,
+  nullable: z.boolean().optional(),
+  defaultValue: z.string().optional(),
+  isPrimaryKey: z.boolean().optional(),
+  isForeignKey: z.boolean().optional(),
+  references: z
+    .object({
+      table: z.string(),
+      field: z.string(),
+    })
+    .optional(),
+  // Legacy fields kept for backward compatibility.
+  required: z.boolean().optional(),
+  unique: z.boolean().optional(),
+  primaryKey: z.boolean().optional(),
+});
+
+export const DatabaseTableSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  fields: z.array(DatabaseTableFieldSchema).default([]),
+  indexes: z.array(z.string()).optional(),
+});
+
+export const DatabaseRelationshipSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  type: DatabaseRelationTypeSchema,
+  fromTableId: z.string(),
+  toTableId: z.string(),
+  fromFieldId: z.string().optional(),
+  toFieldId: z.string().optional(),
+  onDelete: z.enum(["cascade", "restrict", "set_null", "no_action"]).default("no_action"),
+});
+
+export const DatabaseQueryWorkbenchSchema = z.object({
+  query: z.string().default(""),
+  ormTarget: DatabaseOrmTargetSchema.default("prisma"),
+  mockRows: z.number().min(1).max(50).default(5),
+});
+
 export const DatabaseBlockSchema = z.object({
   kind: z.literal("database"),
   id: z.string(),
@@ -175,6 +244,13 @@ export const DatabaseBlockSchema = z.object({
   engine: z.string().optional(),
   capabilities: DatabaseCapabilitiesSchema,
   schemas: z.array(z.string()).default([]),
+  tables: z.array(DatabaseTableSchema).default([]),
+  relationships: z.array(DatabaseRelationshipSchema).default([]),
+  queryWorkbench: DatabaseQueryWorkbenchSchema.default({
+    query: "",
+    ormTarget: "prisma",
+    mockRows: 5,
+  }),
   description: z.string().optional(),
 });
 
@@ -471,6 +547,13 @@ export type ProcessNode = z.infer<typeof ProcessNodeSchema>;
 export type NodeData = z.infer<typeof NodeDataSchema>;
 export type ProcessDefinition = z.infer<typeof ProcessDefinitionSchema>;
 export type DatabaseBlock = z.infer<typeof DatabaseBlockSchema>;
+export type DatabaseTable = z.infer<typeof DatabaseTableSchema>;
+export type DatabaseTableField = z.infer<typeof DatabaseTableFieldSchema>;
+export type DatabaseRelationship = z.infer<typeof DatabaseRelationshipSchema>;
+export type DatabaseFieldType = z.infer<typeof DatabaseFieldTypeSchema>;
+export type DatabaseRelationType = z.infer<typeof DatabaseRelationTypeSchema>;
+export type DatabaseOrmTarget = z.infer<typeof DatabaseOrmTargetSchema>;
+export type DatabaseQueryWorkbench = z.infer<typeof DatabaseQueryWorkbenchSchema>;
 export type QueueBlock = z.infer<typeof QueueBlockSchema>;
 export type InfraBlock = z.infer<typeof InfraBlockSchema>;
 export type InfraResourceType = z.infer<typeof InfraResourceTypeSchema>;

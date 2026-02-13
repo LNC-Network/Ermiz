@@ -169,6 +169,20 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
         </div>
       )}
 
+      <div
+        style={{
+          padding: "8px 12px",
+          borderTop: "1px solid var(--border)",
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 10,
+          color: "var(--muted)",
+        }}
+      >
+        <span>Tables: {dbData.tables?.length || 0}</span>
+        <span>Relations: {dbData.relationships?.length || 0}</span>
+      </div>
+
       {/* Handles */}
       <Handle
         type="target"

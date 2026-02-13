@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { PropertyInspector } from "@/components/panels/PropertyInspector";
+import { DatabaseSchemaDesigner } from "@/components/panels/DatabaseSchemaDesigner";
+import { DatabaseQueryBuilder } from "@/components/panels/DatabaseQueryBuilder";
 import { supabaseClient } from "@/lib/supabase/client";
 import { useStore } from "@/store/useStore";
 
@@ -50,8 +52,10 @@ type SidebarSection = {
 
 function Workspace({
   sections,
+  isDatabaseWorkspace = false,
 }: {
   sections: SidebarSection[];
+  isDatabaseWorkspace?: boolean;
 }) {
   const addNode = useStore((state) => state.addNode);
   const [collapsedSections, setCollapsedSections] = useState<
@@ -500,9 +504,19 @@ function Workspace({
           position: "relative",
           background: "var(--background)",
           minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
-        <FlowCanvas />
+        <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+          <FlowCanvas />
+        </div>
+        {isDatabaseWorkspace && (
+          <>
+            <DatabaseSchemaDesigner />
+            <DatabaseQueryBuilder />
+          </>
+        )}
       </main>
 
       {isInspectorCollapsed ? (
@@ -2544,6 +2558,7 @@ export default function Home() {
                   ? infraSections
                   : databaseSections
             }
+            isDatabaseWorkspace={activeTab === "database"}
           />
         )}
       </div>
