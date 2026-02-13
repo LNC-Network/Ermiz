@@ -5,14 +5,6 @@ import { ProcessDefinition, InputField, OutputField } from "@/lib/schema/node";
 export const ProcessNode = memo(({ data, selected }: NodeProps) => {
   const processData = data as unknown as ProcessDefinition;
 
-  const typeColors: Record<string, string> = {
-    calculation: "#60a5fa",
-    database_workflow: "#4ade80",
-    queue_consumer: "#facc15",
-    job: "#fb923c",
-    orchestrated_workflow: "#a78bfa",
-  };
-
   const executionLabels: Record<string, string> = {
     sync: "Sync",
     async: "Async",
@@ -52,11 +44,11 @@ export const ProcessNode = memo(({ data, selected }: NodeProps) => {
               fontSize: 10,
               fontWeight: 600,
               textTransform: "uppercase",
-              color: typeColors[processData.processType] || "var(--muted)",
+              color: "#a78bfa",
               letterSpacing: "0.05em",
             }}
           >
-            {processData.processType.replace("_", " ")}
+            Function Block
           </span>
           <span style={{ fontSize: 10, color: "var(--muted)" }}>
             {executionLabels[processData.execution]}

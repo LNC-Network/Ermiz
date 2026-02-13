@@ -67,9 +67,62 @@ export function ContextMenu({
     >
       {/* Main Options */}
       {[
-        { kind: "process", label: "Process", icon: "⚙️", color: "#a78bfa" },
+        {
+          kind: "process",
+          label: "Function Block",
+          icon: "⚙️",
+          color: "#a78bfa",
+        },
         { kind: "database", label: "Database", icon: "🗄️", color: "#4ade80" },
         { kind: "queue", label: "Queue", icon: "📬", color: "#facc15" },
+        {
+          kind: "api_rest",
+          label: "REST Interface",
+          icon: "🔗",
+          color: "#60a5fa",
+        },
+        {
+          kind: "api_ws",
+          label: "WebSocket Interface",
+          icon: "🛰️",
+          color: "#22d3ee",
+        },
+        {
+          kind: "api_socketio",
+          label: "Socket.IO Interface",
+          icon: "🧩",
+          color: "#38bdf8",
+        },
+        {
+          kind: "api_webrtc",
+          label: "WebRTC Interface",
+          icon: "📹",
+          color: "#f472b6",
+        },
+        {
+          kind: "api_graphql",
+          label: "GraphQL Interface",
+          icon: "🕸️",
+          color: "#c084fc",
+        },
+        {
+          kind: "api_grpc",
+          label: "gRPC Interface",
+          icon: "📡",
+          color: "#34d399",
+        },
+        {
+          kind: "api_sse",
+          label: "SSE Interface",
+          icon: "📣",
+          color: "#f59e0b",
+        },
+        {
+          kind: "api_webhook",
+          label: "Webhook Interface",
+          icon: "🪝",
+          color: "#fb7185",
+        },
       ].map((item) => (
         <div
           key={item.kind}
@@ -88,54 +141,6 @@ export function ContextMenu({
           <span>{item.label}</span>
         </div>
       ))}
-
-      <div
-        style={{ height: 1, background: "var(--border)", margin: "4px 0" }}
-      />
-
-      {/* API Methods - Compact Grid */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 2,
-          padding: "2px 4px",
-        }}
-      >
-        {[
-          { kind: "api_get", label: "GET", color: "#4ade80" },
-          { kind: "api_post", label: "POST", color: "#facc15" },
-          { kind: "api_put", label: "PUT", color: "#60a5fa" },
-          { kind: "api_delete", label: "DEL", color: "#ef4444" },
-          { kind: "api_patch", label: "PATCH", color: "#a78bfa" },
-        ].map((api) => (
-          <div
-            key={api.kind}
-            onClick={() => handleClick(api.kind)}
-            style={{
-              padding: "3px 6px",
-              borderRadius: 3,
-              cursor: "pointer",
-              fontSize: 9,
-              fontFamily: "monospace",
-              fontWeight: 600,
-              color: api.color,
-              background: "var(--background)",
-              transition: "all 0.1s",
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = api.color;
-              e.currentTarget.style.color = "#000";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = "var(--background)";
-              e.currentTarget.style.color = api.color;
-            }}
-          >
-            {api.label}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
