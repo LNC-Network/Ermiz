@@ -8,6 +8,8 @@ import {
   ProcessDefinition,
   DatabaseBlock,
   QueueBlock,
+  InfraBlock,
+  InfraResourceType,
   ApiBinding,
   InputField,
   OutputField,
@@ -41,6 +43,123 @@ const sectionStyle: React.CSSProperties = {
   borderTop: "1px solid var(--border)",
   paddingTop: 12,
   marginTop: 8,
+};
+
+const infraFieldSets: Record<
+  InfraResourceType,
+  {
+    title: string;
+    fields: Array<{
+      key: string;
+      label: string;
+      type: "text" | "number" | "boolean" | "select";
+      placeholder?: string;
+      options?: string[];
+    }>;
+  }
+> = {
+  ec2: {
+    title: "EC2 Configuration",
+    fields: [
+      { key: "instanceType", label: "Instance type", type: "text" },
+      { key: "ami", label: "AMI", type: "text" },
+      { key: "count", label: "Instance count", type: "number" },
+      { key: "subnetIds", label: "Subnet IDs", type: "text" },
+      { key: "securityGroups", label: "Security groups", type: "text" },
+      { key: "diskGb", label: "Root disk (GB)", type: "number" },
+      { key: "autoscalingMin", label: "Autoscaling min", type: "number" },
+      { key: "autoscalingMax", label: "Autoscaling max", type: "number" },
+    ],
+  },
+  lambda: {
+    title: "Lambda Configuration",
+    fields: [
+      { key: "runtime", label: "Runtime", type: "text" },
+      { key: "memoryMb", label: "Memory (MB)", type: "number" },
+      { key: "timeoutSec", label: "Timeout (sec)", type: "number" },
+      { key: "handler", label: "Handler", type: "text" },
+      { key: "source", label: "Source", type: "text" },
+      { key: "trigger", label: "Trigger", type: "text" },
+      { key: "environmentVars", label: "Environment vars", type: "text" },
+    ],
+  },
+  eks: {
+    title: "EKS Configuration",
+    fields: [
+      { key: "version", label: "K8s version", type: "text" },
+      { key: "nodeType", label: "Node type", type: "text" },
+      { key: "nodeCount", label: "Node count", type: "number" },
+      { key: "minNodes", label: "Min nodes", type: "number" },
+      { key: "maxNodes", label: "Max nodes", type: "number" },
+      { key: "vpcId", label: "VPC ID", type: "text" },
+      { key: "privateSubnets", label: "Private subnets", type: "text" },
+      { key: "clusterLogs", label: "Cluster logs", type: "text" },
+    ],
+  },
+  vpc: {
+    title: "VPC Configuration",
+    fields: [
+      { key: "cidr", label: "CIDR block", type: "text" },
+      { key: "publicSubnets", label: "Public subnets", type: "text" },
+      { key: "privateSubnets", label: "Private subnets", type: "text" },
+      { key: "natGateways", label: "NAT gateways", type: "number" },
+      { key: "flowLogs", label: "Enable flow logs", type: "boolean" },
+    ],
+  },
+  s3: {
+    title: "S3 Configuration",
+    fields: [
+      { key: "bucketName", label: "Bucket name", type: "text" },
+      { key: "versioning", label: "Versioning", type: "boolean" },
+      { key: "encryption", label: "Encryption", type: "text" },
+      { key: "lifecycle", label: "Lifecycle policy", type: "text" },
+      { key: "publicAccess", label: "Public access", type: "text" },
+    ],
+  },
+  rds: {
+    title: "RDS Configuration",
+    fields: [
+      { key: "engine", label: "Engine", type: "text" },
+      { key: "engineVersion", label: "Engine version", type: "text" },
+      { key: "instanceClass", label: "Instance class", type: "text" },
+      { key: "storageGb", label: "Storage (GB)", type: "number" },
+      { key: "multiAz", label: "Multi-AZ", type: "boolean" },
+      { key: "backupRetentionDays", label: "Backup retention (days)", type: "number" },
+      { key: "subnetGroup", label: "Subnet group", type: "text" },
+    ],
+  },
+  load_balancer: {
+    title: "Load Balancer Configuration",
+    fields: [
+      {
+        key: "lbType",
+        label: "Type",
+        type: "select",
+        options: ["ALB", "NLB", "GLB"],
+      },
+      {
+        key: "scheme",
+        label: "Scheme",
+        type: "select",
+        options: ["internet-facing", "internal"],
+      },
+      { key: "listeners", label: "Listeners", type: "text" },
+      { key: "targetGroup", label: "Target group", type: "text" },
+      { key: "healthCheckPath", label: "Health check path", type: "text" },
+      { key: "tlsCertArn", label: "TLS cert ARN", type: "text" },
+    ],
+  },
+  hpc: {
+    title: "HPC Configuration",
+    fields: [
+      { key: "scheduler", label: "Scheduler", type: "text" },
+      { key: "instanceType", label: "Instance type", type: "text" },
+      { key: "nodeCount", label: "Node count", type: "number" },
+      { key: "maxNodes", label: "Max nodes", type: "number" },
+      { key: "sharedStorage", label: "Shared storage", type: "text" },
+      { key: "queue", label: "Queue", type: "text" },
+    ],
+  },
 };
 
 export function PropertyInspector({ width = 320 }: { width?: number }) {
@@ -550,6 +669,187 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
             />
             Enable Dead Letter Queue
           </label>
+        </>
+      )}
+
+      {/* Infra-specific fields */}
+      {kind === "infra" && (
+        <>
+          <div style={sectionStyle}>
+            <div style={labelStyle}>Provider</div>
+            <select
+              value={(nodeData as InfraBlock).provider}
+              onChange={(e) =>
+                handleUpdate({
+                  provider: e.target.value,
+                } as Partial<InfraBlock>)
+              }
+              style={selectStyle}
+            >
+              <option value="aws">AWS</option>
+              <option value="gcp">Google Cloud</option>
+              <option value="azure">Azure</option>
+              <option value="generic">Generic</option>
+            </select>
+          </div>
+
+          <div>
+            <div style={labelStyle}>Environment</div>
+            <select
+              value={(nodeData as InfraBlock).environment}
+              onChange={(e) =>
+                handleUpdate({
+                  environment: e.target.value,
+                } as Partial<InfraBlock>)
+              }
+              style={selectStyle}
+            >
+              <option value="production">Production</option>
+              <option value="staging">Staging</option>
+              <option value="preview">Preview</option>
+              <option value="dev">Dev</option>
+            </select>
+          </div>
+
+          <div>
+            <div style={labelStyle}>Region</div>
+            <input
+              type="text"
+              value={(nodeData as InfraBlock).region}
+              onChange={(e) =>
+                handleUpdate({
+                  region: e.target.value,
+                } as Partial<InfraBlock>)
+              }
+              placeholder="us-east-1"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div style={labelStyle}>Tags (comma-separated)</div>
+            <input
+              type="text"
+              value={((nodeData as InfraBlock).tags || []).join(", ")}
+              onChange={(e) =>
+                handleUpdate({
+                  tags: e.target.value
+                    .split(",")
+                    .map((tag) => tag.trim())
+                    .filter(Boolean),
+                } as Partial<InfraBlock>)
+              }
+              placeholder="env=prod, owner=platform"
+              style={inputStyle}
+            />
+          </div>
+
+          <div style={sectionStyle}>
+            <div style={labelStyle}>Resource Type</div>
+            <div style={{ fontSize: 12, color: "var(--secondary)" }}>
+              {(nodeData as InfraBlock).resourceType.replace("_", " ")}
+            </div>
+          </div>
+
+          <div style={sectionStyle}>
+            <div style={labelStyle}>
+              {infraFieldSets[(nodeData as InfraBlock).resourceType].title}
+            </div>
+            {infraFieldSets[(nodeData as InfraBlock).resourceType].fields.map(
+              (field) => {
+                const config = (nodeData as InfraBlock).config as Record<
+                  string,
+                  string | number | boolean
+                >;
+                const value = config[field.key];
+
+                if (field.type === "boolean") {
+                  return (
+                    <label
+                      key={field.key}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 11,
+                        color: "var(--secondary)",
+                        marginBottom: 6,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(value)}
+                        onChange={(e) =>
+                          handleUpdate({
+                            config: {
+                              ...(nodeData as InfraBlock).config,
+                              [field.key]: e.target.checked,
+                            },
+                          } as Partial<InfraBlock>)
+                        }
+                        style={{ accentColor: "var(--primary)" }}
+                      />
+                      {field.label}
+                    </label>
+                  );
+                }
+
+                if (field.type === "select") {
+                  return (
+                    <div key={field.key} style={{ marginBottom: 8 }}>
+                      <div style={labelStyle}>{field.label}</div>
+                      <select
+                        value={String(value ?? "")}
+                        onChange={(e) =>
+                          handleUpdate({
+                            config: {
+                              ...(nodeData as InfraBlock).config,
+                              [field.key]: e.target.value,
+                            },
+                          } as Partial<InfraBlock>)
+                        }
+                        style={selectStyle}
+                      >
+                        {(field.options || []).map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={field.key} style={{ marginBottom: 8 }}>
+                    <div style={labelStyle}>{field.label}</div>
+                    <input
+                      type={field.type === "number" ? "number" : "text"}
+                      value={
+                        typeof value === "number" || typeof value === "string"
+                          ? value
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const nextValue =
+                          field.type === "number"
+                            ? Number(e.target.value || 0)
+                            : e.target.value;
+                        handleUpdate({
+                          config: {
+                            ...(nodeData as InfraBlock).config,
+                            [field.key]: nextValue,
+                          },
+                        } as Partial<InfraBlock>);
+                      }}
+                      placeholder={field.placeholder}
+                      style={inputStyle}
+                    />
+                  </div>
+                );
+              },
+            )}
+          </div>
         </>
       )}
 
