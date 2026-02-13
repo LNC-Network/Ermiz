@@ -123,6 +123,12 @@ export function ContextMenu({
           icon: "🪝",
           color: "#fb7185",
         },
+        {
+          kind: "service_boundary",
+          label: "Service Boundary",
+          icon: "🧱",
+          color: "#fb7185",
+        },
       ].map((item) => (
         <div
           key={item.kind}

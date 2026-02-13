@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { PropertyInspector } from "@/components/panels/PropertyInspector";
 import { DatabaseSchemaDesigner } from "@/components/panels/DatabaseSchemaDesigner";
 import { DatabaseQueryBuilder } from "@/components/panels/DatabaseQueryBuilder";
+import { analyzeDesignSystem, GraphCollection } from "@/lib/runtime/architecture";
 import { supabaseClient } from "@/lib/supabase/client";
 import { useStore } from "@/store/useStore";
 
@@ -61,10 +62,12 @@ function Workspace({
   sections,
   flatList = false,
   showSearch = false,
+  isDatabaseWorkspace = false,
 }: {
   sections: SidebarSection[];
   flatList?: boolean;
   showSearch?: boolean;
+  isDatabaseWorkspace?: boolean;
 }) {
   const addNode = useStore((state) => state.addNode);
   const [collapsedSections, setCollapsedSections] = useState<
@@ -360,7 +363,7 @@ function Workspace({
 
           <aside
             style={{
-              width: sidebarWidth,
+              width: leftSidebarWidth,
               flexShrink: 0,
               height: "100%",
               minHeight: 0,
@@ -1001,10 +1004,16 @@ function AgentWorkspace() {
 }
 
 function DeployWorkspace() {
+  const graphs = useStore((state) => state.graphs);
   const [platform, setPlatform] = useState("vercel");
   const [credentialType, setCredentialType] = useState("oauth");
   const [billingMode, setBillingMode] = useState("platform");
   const [environment, setEnvironment] = useState("production");
+  const architecture = useMemo(
+    () => analyzeDesignSystem(graphs as unknown as GraphCollection),
+    [graphs],
+  );
+  const deployBlocked = !architecture.deploy.ready;
 
   const platforms = [
     {
@@ -1087,7 +1096,7 @@ function DeployWorkspace() {
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button type="button" style={actionButtonStyle}>
-              Validate
+              Validate ({architecture.deploy.errorCount} errors)
             </button>
             <button
               type="button"
@@ -1101,18 +1110,154 @@ function DeployWorkspace() {
             </button>
             <button
               type="button"
+              disabled={deployBlocked}
               style={{
                 ...actionButtonStyle,
                 background:
-                  "color-mix(in srgb, var(--secondary) 18%, var(--panel) 82%)",
+                  deployBlocked
+                    ? "color-mix(in srgb, var(--floating) 95%, #111111 5%)"
+                    : "color-mix(in srgb, var(--secondary) 18%, var(--panel) 82%)",
+                opacity: deployBlocked ? 0.6 : 1,
+                cursor: deployBlocked ? "not-allowed" : "pointer",
               }}
             >
-              Deploy
+              {deployBlocked ? "Deploy Blocked" : "Deploy"}
             </button>
             <button type="button" style={actionButtonStyle}>
               Rollback
             </button>
           </div>
+        </section>
+
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--panel)",
+            borderRadius: 14,
+            padding: 16,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 600 }}>
+              Runtime Architecture Model
+            </div>
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 999,
+                padding: "4px 10px",
+                fontSize: 11,
+                color: architecture.deploy.ready ? "#4ade80" : "#f87171",
+              }}
+            >
+              {architecture.deploy.ready ? "Deploy Ready" : "Not Deployable"}
+            </div>
+          </div>
+
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--muted)",
+              display: "grid",
+              gap: 4,
+            }}
+          >
+            <div>
+              Dependency direction: {architecture.runtimeModel.dependencyDirection}
+            </div>
+            <div>Hosting: {architecture.runtimeModel.hostingLayer}</div>
+            <div>
+              Layers: API {architecture.runtimeModel.layerCounts.api} | Functional{" "}
+              {architecture.runtimeModel.layerCounts.functional} | Data{" "}
+              {architecture.runtimeModel.layerCounts.data} | Infra{" "}
+              {architecture.runtimeModel.layerCounts.infra}
+            </div>
+          </div>
+
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Design Workflow Model</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {architecture.workflowModel.stages.map((stage) => (
+              <div
+                key={stage.id}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  background: "var(--floating)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{stage.title}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                    {stage.detail}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color:
+                      stage.status === "complete"
+                        ? "#4ade80"
+                        : stage.status === "blocked"
+                          ? "#f87171"
+                          : "#facc15",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                  }}
+                >
+                  {stage.status}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Service Boundary Rules</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {architecture.serviceModel.rules.map((rule) => (
+              <div key={rule} style={{ fontSize: 12, color: "var(--muted)" }}>
+                • {rule}
+              </div>
+            ))}
+          </div>
+
+          {(architecture.runtimeModel.issues.length > 0 ||
+            architecture.serviceModel.issues.length > 0) && (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Blocking Issues</div>
+              {[...architecture.runtimeModel.issues, ...architecture.serviceModel.issues]
+                .filter((issue) => issue.severity === "error")
+                .slice(0, 12)
+                .map((issue, index) => (
+                  <div
+                    key={`${issue.code}-${index}`}
+                    style={{
+                      border: "1px solid color-mix(in srgb, #ef4444 40%, var(--border) 60%)",
+                      borderRadius: 8,
+                      padding: "7px 9px",
+                      fontSize: 11,
+                      color: "#fda4af",
+                      background: "color-mix(in srgb, #ef4444 12%, var(--panel) 88%)",
+                    }}
+                  >
+                    {issue.message}
+                  </div>
+                ))}
+            </div>
+          )}
         </section>
 
         <section
@@ -1767,6 +1912,19 @@ export default function Home() {
       ],
     },
     {
+      id: "api-services",
+      title: "Service Boundaries",
+      items: [
+        {
+          kind: "service_boundary",
+          label: "Service Boundary",
+          icon: "🧱",
+          hoverColor: "#fb7185",
+          hint: "Own API, functions, and data per service",
+        },
+      ],
+    },
+    {
       id: "api-infra",
       title: "Infrastructure",
       items: [
@@ -1909,6 +2067,19 @@ export default function Home() {
           icon: "📡",
           hoverColor: "#22d3ee",
           hint: "ALB/NLB listeners + targets",
+        },
+      ],
+    },
+    {
+      id: "infra-services",
+      title: "Service Boundaries",
+      items: [
+        {
+          kind: "service_boundary",
+          label: "Service Boundary",
+          icon: "🧱",
+          hoverColor: "#fb7185",
+          hint: "Bind service ownership to compute runtime",
         },
       ],
     },
@@ -2113,6 +2284,19 @@ export default function Home() {
         },
       ],
     },
+    {
+      id: "db-services",
+      title: "Service Boundaries",
+      items: [
+        {
+          kind: "service_boundary",
+          label: "Service Boundary",
+          icon: "🧱",
+          hoverColor: "#fb7185",
+          hint: "Assign data ownership to a service",
+        },
+      ],
+    },
   ];
 
   const functionSections: SidebarSection[] = [
@@ -2126,6 +2310,19 @@ export default function Home() {
           icon: "⚙️",
           hoverColor: "#a78bfa",
           hint: "Define reusable business function",
+        },
+      ],
+    },
+    {
+      id: "functions-services",
+      title: "Service Boundaries",
+      items: [
+        {
+          kind: "service_boundary",
+          label: "Service Boundary",
+          icon: "🧱",
+          hoverColor: "#fb7185",
+          hint: "Assign function ownership to a service",
         },
       ],
     },
@@ -2778,6 +2975,7 @@ export default function Home() {
             }
             flatList={activeTab === "api"}
             showSearch={activeTab === "api"}
+            isDatabaseWorkspace={activeTab === "database"}
           />
         )}
       </div>

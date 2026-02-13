@@ -24,6 +24,7 @@ type NodeKind =
   | "process"
   | "database"
   | "queue"
+  | "service_boundary"
   | "api_binding"
   | "api_rest"
   | "api_ws"
@@ -256,7 +257,11 @@ export const useStore = create<RFState>((set, get) => {
     addNode: (kind: NodeKind, customPosition?: { x: number; y: number }) => {
       const nodes = get().nodes;
       const activeTab = get().activeTab;
-      if (activeTab === "functions" && kind !== "process") {
+      if (
+        activeTab === "functions" &&
+        kind !== "process" &&
+        kind !== "service_boundary"
+      ) {
         return;
       }
       if (kind === "process" && activeTab === "api") {
@@ -403,6 +408,25 @@ export const useStore = create<RFState>((set, get) => {
             retry: { maxAttempts: 3, backoff: "exponential" },
             deadLetter: true,
             description: "",
+          },
+        },
+        service_boundary: {
+          type: "service_boundary",
+          data: {
+            kind: "service_boundary",
+            id: `service_${Date.now()}`,
+            label: "Service Boundary",
+            description: "",
+            apiRefs: [],
+            functionRefs: [],
+            dataRefs: [],
+            computeRef: "",
+            communication: {
+              allowApiCalls: true,
+              allowQueueEvents: true,
+              allowEventBus: true,
+              allowDirectDbAccess: false,
+            },
           },
         },
         api_binding: {
@@ -835,16 +859,62 @@ export const useStore = create<RFState>((set, get) => {
     };
 
       const config = nodeConfigs[kind];
+      const isApiKind = kind === "api_binding" || kind.startsWith("api_");
+      let nodeData = { ...(config.data as object) } as NodeData;
+      const nextNodes = nodes.map((node) => ({ ...node, selected: false }));
+
+      if (activeTab === "api" && isApiKind && nodeData.kind === "api_binding") {
+        const existingApiProcessNode = nextNodes.find((node) => {
+          const data = node.data as NodeData;
+          return data.kind === "process";
+        });
+        let apiProcessId = "";
+
+        if (existingApiProcessNode) {
+          const existingProcessData = existingApiProcessNode.data as NodeData & {
+            kind: "process";
+            id: string;
+          };
+          apiProcessId = existingProcessData.id;
+        } else {
+          apiProcessId = `api_function_${Date.now()}`;
+          const placeholderProcessNode: Node = {
+            id: `node-${Date.now() + 1}`,
+            type: "process",
+            position: { x: position.x + 320, y: position.y + 40 },
+            data: {
+              kind: "process",
+              id: apiProcessId,
+              label: "API Function Block",
+              processType: "function_block",
+              execution: "sync",
+              description:
+                "Attach imports from Functions tab to complete API behavior.",
+              inputs: [],
+              outputs: { success: [], error: [] },
+              steps: [],
+            },
+            selected: false,
+          };
+          nextNodes.push(placeholderProcessNode);
+        }
+
+        nodeData = {
+          ...(nodeData as object),
+          processRef: apiProcessId,
+        } as NodeData;
+      }
+
       const newNode: Node = {
         id,
         type: config.type,
         position,
-        data: config.data,
+        data: nodeData,
         selected: true,
       };
 
       updateActiveGraph({
-        nodes: [...nodes.map((n) => ({ ...n, selected: false })), newNode],
+        nodes: [...nextNodes, newNode],
       });
     },
 

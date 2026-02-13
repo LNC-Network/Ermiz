@@ -15,6 +15,7 @@ import {
   DatabaseTable,
   DatabaseTableField,
   QueueBlock,
+  ServiceBoundaryBlock,
   InfraBlock,
   InfraResourceType,
   ApiBinding,
@@ -310,6 +311,30 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
           .filter((step) => step.kind === "ref" && Boolean(step.ref))
           .map((step) => step.ref as string)
       : [];
+  const allApiIds = Object.values(graphs)
+    .flatMap((graph) => graph.nodes || [])
+    .map((node) => node.data as NodeData)
+    .filter((data): data is ApiBinding => data.kind === "api_binding")
+    .map((api) => ({ id: api.id, label: api.label || api.id }));
+  const allFunctionIds = Object.values(graphs)
+    .flatMap((graph) => graph.nodes || [])
+    .map((node) => node.data as NodeData)
+    .filter((data): data is ProcessDefinition => data.kind === "process")
+    .map((fn) => ({ id: fn.id, label: fn.label || fn.id }));
+  const allDataIds = Object.values(graphs)
+    .flatMap((graph) => graph.nodes || [])
+    .map((node) => node.data as NodeData)
+    .filter((data): data is DatabaseBlock => data.kind === "database")
+    .map((db) => ({ id: db.id, label: db.label || db.id }));
+  const computeInfraIds = Object.values(graphs)
+    .flatMap((graph) => graph.nodes || [])
+    .map((node) => node.data as NodeData)
+    .filter(
+      (data): data is InfraBlock =>
+        data.kind === "infra" &&
+        ["ec2", "lambda", "eks", "hpc"].includes(data.resourceType),
+    )
+    .map((infra) => ({ id: infra.id, label: infra.label || infra.id }));
 
   const handleUpdate = (updates: Partial<NodeData>) => {
     updateNodeData(selectedNode.id, updates);
@@ -3800,6 +3825,213 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
             />
             Enable Dead Letter Queue
           </label>
+        </>
+      )}
+
+      {/* Service boundary-specific fields */}
+      {kind === "service_boundary" && (
+        <>
+          <div style={sectionStyle}>
+            <div style={labelStyle}>API Ownership (comma-separated IDs)</div>
+            <input
+              type="text"
+              value={((nodeData as ServiceBoundaryBlock).apiRefs || []).join(", ")}
+              onChange={(e) =>
+                handleUpdate({
+                  apiRefs: e.target.value
+                    .split(",")
+                    .map((v) => v.trim())
+                    .filter(Boolean),
+                } as Partial<ServiceBoundaryBlock>)
+              }
+              placeholder="paymentsApi, usersApi"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div style={labelStyle}>Function Ownership (comma-separated IDs)</div>
+            <input
+              type="text"
+              value={((nodeData as ServiceBoundaryBlock).functionRefs || []).join(", ")}
+              onChange={(e) =>
+                handleUpdate({
+                  functionRefs: e.target.value
+                    .split(",")
+                    .map((v) => v.trim())
+                    .filter(Boolean),
+                } as Partial<ServiceBoundaryBlock>)
+              }
+              placeholder="createOrderFn, refundFn"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div style={labelStyle}>Data Ownership (comma-separated IDs)</div>
+            <input
+              type="text"
+              value={((nodeData as ServiceBoundaryBlock).dataRefs || []).join(", ")}
+              onChange={(e) =>
+                handleUpdate({
+                  dataRefs: e.target.value
+                    .split(",")
+                    .map((v) => v.trim())
+                    .filter(Boolean),
+                } as Partial<ServiceBoundaryBlock>)
+              }
+              placeholder="ordersDb, billingDb"
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <div style={labelStyle}>Compute Host</div>
+            <select
+              value={(nodeData as ServiceBoundaryBlock).computeRef || ""}
+              onChange={(e) =>
+                handleUpdate({
+                  computeRef: e.target.value,
+                } as Partial<ServiceBoundaryBlock>)
+              }
+              style={selectStyle}
+            >
+              <option value="">Select compute resource</option>
+              {computeInfraIds.map((compute) => (
+                <option key={compute.id} value={compute.id}>
+                  {compute.label} ({compute.id})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={sectionStyle}>
+            <div style={{ ...labelStyle, marginBottom: 8 }}>Communication Rules</div>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 11,
+                color: "var(--secondary)",
+                marginBottom: 6,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={
+                  (nodeData as ServiceBoundaryBlock).communication
+                    ?.allowApiCalls ?? true
+                }
+                onChange={(e) =>
+                  handleUpdate({
+                    communication: {
+                      ...(nodeData as ServiceBoundaryBlock).communication,
+                      allowApiCalls: e.target.checked,
+                    },
+                  } as Partial<ServiceBoundaryBlock>)
+                }
+                style={{ accentColor: "var(--primary)" }}
+              />
+              Allow API calls
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 11,
+                color: "var(--secondary)",
+                marginBottom: 6,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={
+                  (nodeData as ServiceBoundaryBlock).communication
+                    ?.allowQueueEvents ?? true
+                }
+                onChange={(e) =>
+                  handleUpdate({
+                    communication: {
+                      ...(nodeData as ServiceBoundaryBlock).communication,
+                      allowQueueEvents: e.target.checked,
+                    },
+                  } as Partial<ServiceBoundaryBlock>)
+                }
+                style={{ accentColor: "var(--primary)" }}
+              />
+              Allow queue events
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 11,
+                color: "var(--secondary)",
+                marginBottom: 6,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={
+                  (nodeData as ServiceBoundaryBlock).communication
+                    ?.allowEventBus ?? true
+                }
+                onChange={(e) =>
+                  handleUpdate({
+                    communication: {
+                      ...(nodeData as ServiceBoundaryBlock).communication,
+                      allowEventBus: e.target.checked,
+                    },
+                  } as Partial<ServiceBoundaryBlock>)
+                }
+                style={{ accentColor: "var(--primary)" }}
+              />
+              Allow event bus
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 11,
+                color: "#fca5a5",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={
+                  (nodeData as ServiceBoundaryBlock).communication
+                    ?.allowDirectDbAccess ?? false
+                }
+                onChange={(e) =>
+                  handleUpdate({
+                    communication: {
+                      ...(nodeData as ServiceBoundaryBlock).communication,
+                      allowDirectDbAccess: e.target.checked,
+                    },
+                  } as Partial<ServiceBoundaryBlock>)
+                }
+                style={{ accentColor: "#ef4444" }}
+              />
+              Allow direct DB sharing (not recommended)
+            </label>
+          </div>
+
+          <div style={sectionStyle}>
+            <div style={{ ...labelStyle, marginBottom: 6 }}>Available IDs</div>
+            <div style={{ fontSize: 10, color: "var(--muted)" }}>
+              APIs: {allApiIds.map((item) => item.id).join(", ") || "(none)"}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+              Functions: {allFunctionIds.map((item) => item.id).join(", ") || "(none)"}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>
+              Data: {allDataIds.map((item) => item.id).join(", ") || "(none)"}
+            </div>
+          </div>
         </>
       )}
 

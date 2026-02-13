@@ -21,6 +21,7 @@ import { DatabaseNode } from "./nodes/DatabaseNode";
 import { QueueNode } from "./nodes/QueueNode";
 import { ApiBindingNode } from "./nodes/ApiBindingNode";
 import { InfraNode } from "./nodes/InfraNode";
+import { ServiceBoundaryNode } from "./nodes/ServiceBoundaryNode";
 import { StepEdge } from "./edges/StepEdge";
 import { ContextMenu } from "./ContextMenu";
 
@@ -30,6 +31,7 @@ const nodeTypes: NodeTypes = {
   queue: QueueNode as unknown as ComponentType<NodeProps>,
   api_binding: ApiBindingNode as unknown as ComponentType<NodeProps>,
   infra: InfraNode as unknown as ComponentType<NodeProps>,
+  service_boundary: ServiceBoundaryNode as unknown as ComponentType<NodeProps>,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -278,6 +280,7 @@ function FlowCanvasInner() {
               if (node.data?.kind === "database") return "#336791";
               if (node.data?.kind === "queue") return "#facc15";
               if (node.data?.kind === "api_binding") return "#a78bfa";
+              if (node.data?.kind === "service_boundary") return "#fb7185";
               if (node.data?.kind === "infra") {
                 switch (node.data?.resourceType) {
                   case "ec2":

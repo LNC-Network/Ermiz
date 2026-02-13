@@ -451,6 +451,33 @@ export const QueueBlockSchema = z.object({
 });
 
 // ============================================
+// Service Boundary Block (Microservice Ownership)
+// ============================================
+export const ServiceBoundaryBlockSchema = z.object({
+  kind: z.literal("service_boundary"),
+  id: z.string(),
+  label: z.string(),
+  description: z.string().optional(),
+  apiRefs: z.array(z.string()).default([]),
+  functionRefs: z.array(z.string()).default([]),
+  dataRefs: z.array(z.string()).default([]),
+  computeRef: z.string().optional(),
+  communication: z
+    .object({
+      allowApiCalls: z.boolean().default(true),
+      allowQueueEvents: z.boolean().default(true),
+      allowEventBus: z.boolean().default(true),
+      allowDirectDbAccess: z.boolean().default(false),
+    })
+    .default({
+      allowApiCalls: true,
+      allowQueueEvents: true,
+      allowEventBus: true,
+      allowDirectDbAccess: false,
+    }),
+});
+
+// ============================================
 // Infra Resources (Terraform-aligned)
 // ============================================
 export const InfraProviderSchema = z.enum(["aws", "gcp", "azure", "generic"]);
@@ -988,6 +1015,7 @@ export const NodeDataSchema = z.union([
   ProcessDefinitionSchema,
   DatabaseBlockSchema,
   QueueBlockSchema,
+  ServiceBoundaryBlockSchema,
   InfraBlockSchema,
   ApiBindingSchema,
 ]);
@@ -1024,6 +1052,7 @@ export type DatabaseMigration = z.infer<typeof DatabaseMigrationSchema>;
 export type DatabaseOrmTarget = z.infer<typeof DatabaseOrmTargetSchema>;
 export type DatabaseQueryWorkbench = z.infer<typeof DatabaseQueryWorkbenchSchema>;
 export type QueueBlock = z.infer<typeof QueueBlockSchema>;
+export type ServiceBoundaryBlock = z.infer<typeof ServiceBoundaryBlockSchema>;
 export type InfraBlock = z.infer<typeof InfraBlockSchema>;
 export type InfraResourceType = z.infer<typeof InfraResourceTypeSchema>;
 export type InfraProvider = z.infer<typeof InfraProviderSchema>;
