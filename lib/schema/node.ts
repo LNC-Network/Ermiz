@@ -247,6 +247,49 @@ export const DatabaseMonitoringSchema = z.object({
   }),
 });
 
+export const DatabaseEnvironmentTierSchema = z.enum([
+  "small",
+  "medium",
+  "large",
+]);
+
+export const DatabaseEnvironmentOverrideSchema = z.object({
+  enabled: z.boolean().default(false),
+  performance: DatabasePerformanceSchema.optional(),
+  backup: DatabaseBackupSchema.optional(),
+  monitoring: DatabaseMonitoringSchema.optional(),
+});
+
+export const DatabaseEnvironmentConfigSchema = z.object({
+  connectionString: z.string().default(""),
+  region: z.string().default(""),
+  performanceTier: DatabaseEnvironmentTierSchema.default("small"),
+  overrides: DatabaseEnvironmentOverrideSchema.default({
+    enabled: false,
+  }),
+});
+
+export const DatabaseEnvironmentsSchema = z.object({
+  dev: DatabaseEnvironmentConfigSchema.default({
+    connectionString: "",
+    region: "",
+    performanceTier: "small",
+    overrides: { enabled: false },
+  }),
+  staging: DatabaseEnvironmentConfigSchema.default({
+    connectionString: "",
+    region: "",
+    performanceTier: "medium",
+    overrides: { enabled: false },
+  }),
+  production: DatabaseEnvironmentConfigSchema.default({
+    connectionString: "",
+    region: "",
+    performanceTier: "large",
+    overrides: { enabled: false },
+  }),
+});
+
 export const DatabaseOrmTargetSchema = z.enum([
   "prisma",
   "typeorm",
@@ -411,6 +454,7 @@ export const DatabaseBlockSchema = z.object({
       maxLatencyMs: 300,
     },
   }),
+  environments: DatabaseEnvironmentsSchema.optional(),
   loadedTemplate: z.string().optional(),
   schemas: z.array(z.string()).default([]),
   tables: z.array(DatabaseTableSchema).default([]),
@@ -1051,6 +1095,10 @@ export type DatabaseSeedStrategy = z.infer<typeof DatabaseSeedStrategySchema>;
 export type DatabaseMigration = z.infer<typeof DatabaseMigrationSchema>;
 export type DatabaseOrmTarget = z.infer<typeof DatabaseOrmTargetSchema>;
 export type DatabaseQueryWorkbench = z.infer<typeof DatabaseQueryWorkbenchSchema>;
+export type DatabaseEnvironmentTier = z.infer<typeof DatabaseEnvironmentTierSchema>;
+export type DatabaseEnvironmentOverride = z.infer<typeof DatabaseEnvironmentOverrideSchema>;
+export type DatabaseEnvironmentConfig = z.infer<typeof DatabaseEnvironmentConfigSchema>;
+export type DatabaseEnvironments = z.infer<typeof DatabaseEnvironmentsSchema>;
 export type QueueBlock = z.infer<typeof QueueBlockSchema>;
 export type ServiceBoundaryBlock = z.infer<typeof ServiceBoundaryBlockSchema>;
 export type InfraBlock = z.infer<typeof InfraBlockSchema>;
