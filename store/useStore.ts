@@ -418,6 +418,7 @@ export const useStore = create<RFState>((set, get) => {
             },
             schemas: [],
             tables: [],
+            schemaHistory: [],
             queries: [],
             seeds: [],
             migrations: [],

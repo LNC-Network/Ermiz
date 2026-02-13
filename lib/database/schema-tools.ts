@@ -43,6 +43,7 @@ export const buildDatabaseExportPayload = (database: DatabaseBlock) => ({
   engine: database.engine || "",
   schemas: database.schemas || [],
   tables: database.tables || [],
+  schemaHistory: database.schemaHistory || [],
   relationships: database.relationships || [],
   capabilities: database.capabilities,
   performance: database.performance,
@@ -118,4 +119,3 @@ export const buildDatabaseSchemaDDL = (database: DatabaseBlock) => {
     extension: dbType === "sql" ? `${dialect}.sql` : "schema.txt",
   };
 };
-

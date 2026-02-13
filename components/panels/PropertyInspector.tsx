@@ -9,6 +9,8 @@ import {
   DatabaseBlock,
   DatabaseEnvironmentsSchema,
   DatabaseRelationshipSchema,
+  DatabaseSchemaHistoryEntry,
+  DatabaseSchemaHistoryEntrySchema,
   DatabaseSeedSchema,
   DatabaseTableSchema,
   DatabaseTable,
@@ -41,6 +43,7 @@ import { SecuritySection } from "./database/SecuritySection";
 import { MonitoringSection } from "./database/MonitoringSection";
 import { ConnectedProcessesSection } from "./database/ConnectedProcessesSection";
 import { MigrationsSection } from "./database/MigrationsSection";
+import { ChangeHistorySection } from "./database/ChangeHistorySection";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -69,6 +72,104 @@ const sectionStyle: React.CSSProperties = {
   borderTop: "1px solid var(--border)",
   paddingTop: 12,
   marginTop: 8,
+};
+
+const stableStringify = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+      a.localeCompare(b),
+    );
+    return `{${entries
+      .map(([key, nested]) => `${JSON.stringify(key)}:${stableStringify(nested)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+};
+
+const buildSchemaHistoryEntries = (
+  previousTables: DatabaseTable[],
+  nextTables: DatabaseTable[],
+  timestamp: string,
+): DatabaseSchemaHistoryEntry[] => {
+  const entries: DatabaseSchemaHistoryEntry[] = [];
+  const previousMap = new Map(previousTables.map((table, index) => [table.id || `${table.name}_${index}`, table]));
+  const nextMap = new Map(nextTables.map((table, index) => [table.id || `${table.name}_${index}`, table]));
+
+  nextMap.forEach((table, key) => {
+    if (!previousMap.has(key)) {
+      entries.push({
+        timestamp,
+        changeType: "table_added",
+        target: table.name,
+        details: { before: undefined, after: table },
+      });
+    }
+  });
+
+  previousMap.forEach((table, key) => {
+    if (!nextMap.has(key)) {
+      entries.push({
+        timestamp,
+        changeType: "table_removed",
+        target: table.name,
+        details: { before: table, after: undefined },
+      });
+    }
+  });
+
+  previousMap.forEach((previousTable, key) => {
+    const nextTable = nextMap.get(key);
+    if (!nextTable) return;
+
+    const previousFieldMap = new Map(
+      (previousTable.fields || []).map((field, index) => [field.id || `${field.name}_${index}`, field]),
+    );
+    const nextFieldMap = new Map(
+      (nextTable.fields || []).map((field, index) => [field.id || `${field.name}_${index}`, field]),
+    );
+
+    nextFieldMap.forEach((field, fieldKey) => {
+      if (!previousFieldMap.has(fieldKey)) {
+        entries.push({
+          timestamp,
+          changeType: "field_added",
+          target: `${nextTable.name}.${field.name}`,
+          details: { before: undefined, after: field },
+        });
+      }
+    });
+
+    previousFieldMap.forEach((field, fieldKey) => {
+      if (!nextFieldMap.has(fieldKey)) {
+        entries.push({
+          timestamp,
+          changeType: "field_removed",
+          target: `${previousTable.name}.${field.name}`,
+          details: { before: field, after: undefined },
+        });
+      }
+    });
+
+    previousFieldMap.forEach((previousField, fieldKey) => {
+      const nextField = nextFieldMap.get(fieldKey);
+      if (!nextField) return;
+      if (stableStringify(previousField) === stableStringify(nextField)) return;
+      entries.push({
+        timestamp,
+        changeType: "field_modified",
+        target: `${nextTable.name}.${nextField.name}`,
+        details: {
+          before: previousField,
+          after: nextField,
+        },
+      });
+    });
+  });
+
+  return entries;
 };
 
 const infraFieldSets: Record<
@@ -345,11 +446,20 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
         })[selectedNode.id] || null
       : null;
 
-  const updateDatabaseTables = (tables: DatabaseTable[]) => {
+  const updateDatabaseTables = (
+    tables: DatabaseTable[],
+    extraUpdates: Partial<DatabaseBlock> = {},
+  ) => {
     if (!databaseNodeData) return;
+    const previousTables = databaseNodeData.tables || [];
+    const now = new Date().toISOString();
+    const changeEntries = buildSchemaHistoryEntries(previousTables, tables, now);
+    const baseHistory = extraUpdates.schemaHistory || databaseNodeData.schemaHistory || [];
     handleUpdate({
+      ...extraUpdates,
       tables,
       schemas: tables.map((table) => table.name).filter(Boolean),
+      schemaHistory: [...baseHistory, ...changeEntries],
     } as Partial<DatabaseBlock>);
   };
 
@@ -410,10 +520,8 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
         : undefined,
     }));
 
-    handleUpdate({
-      tables: clonedTables,
+    updateDatabaseTables(clonedTables, {
       relationships: clonedRelationships,
-      schemas: clonedTables.map((table) => table.name),
       loadedTemplate: template.label,
     } as Partial<DatabaseBlock>);
     setIsTemplatePickerOpen(false);
@@ -469,6 +577,7 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
         const relationshipsCandidate = parsed.relationships;
         const seedsCandidate = parsed.seeds;
         const environmentsCandidate = parsed.environments;
+        const schemaHistoryCandidate = parsed.schemaHistory;
         const defaultEnvironmentsCandidate = {
           dev: {
             connectionString: "",
@@ -573,12 +682,18 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
           showSchemaToast("Invalid schema: environments validation failed.", "error");
           return;
         }
-        handleUpdate({
-          tables: tableValidation.data,
+        const schemaHistoryValidation = DatabaseSchemaHistoryEntrySchema.array().safeParse(
+          schemaHistoryCandidate || [],
+        );
+        if (!schemaHistoryValidation.success) {
+          showSchemaToast("Invalid schema: schema history validation failed.", "error");
+          return;
+        }
+        updateDatabaseTables(tableValidation.data, {
           relationships: relationshipValidation.data,
           seeds: seedValidation.data,
           environments: environmentValidation.data,
-          schemas: tableValidation.data.map((table) => table.name),
+          schemaHistory: schemaHistoryValidation.data,
         } as Partial<DatabaseBlock>);
         showSchemaToast("Schema imported.", "success");
       } catch {
@@ -1589,6 +1704,11 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
             onChange={(updates) => handleUpdate(updates as Partial<DatabaseBlock>)}
             inputStyle={inputStyle}
             sectionStyle={sectionStyle}
+          />
+          <ChangeHistorySection
+            database={nodeData as DatabaseBlock}
+            sectionStyle={sectionStyle}
+            selectStyle={selectStyle}
           />
           <div style={{ ...sectionStyle, display: "none" }}>
             <div

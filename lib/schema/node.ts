@@ -329,6 +329,26 @@ export const DatabaseRelationTypeSchema = z.enum([
   "many_to_many",
 ]);
 
+export const DatabaseSchemaChangeTypeSchema = z.enum([
+  "table_added",
+  "field_added",
+  "field_modified",
+  "field_removed",
+  "table_removed",
+]);
+
+export const DatabaseSchemaHistoryEntrySchema = z.object({
+  timestamp: z.string(),
+  changeType: DatabaseSchemaChangeTypeSchema,
+  target: z.string(),
+  details: z
+    .object({
+      before: z.unknown().optional(),
+      after: z.unknown().optional(),
+    })
+    .default({}),
+});
+
 export const DatabaseQueryOperationSchema = z.enum([
   "SELECT",
   "INSERT",
@@ -495,6 +515,7 @@ export const DatabaseBlockSchema = z.object({
   loadedTemplate: z.string().optional(),
   schemas: z.array(z.string()).default([]),
   tables: z.array(DatabaseTableSchema).default([]),
+  schemaHistory: z.array(DatabaseSchemaHistoryEntrySchema).default([]),
   queries: z.array(DatabaseQuerySchema).default([]),
   seeds: z.array(DatabaseSeedSchema).default([]),
   migrations: z.array(DatabaseMigrationSchema).default([]),
@@ -1124,6 +1145,8 @@ export type DatabaseTableField = z.infer<typeof DatabaseTableFieldSchema>;
 export type DatabaseRelationship = z.infer<typeof DatabaseRelationshipSchema>;
 export type DatabaseFieldType = z.infer<typeof DatabaseFieldTypeSchema>;
 export type DatabaseRelationType = z.infer<typeof DatabaseRelationTypeSchema>;
+export type DatabaseSchemaChangeType = z.infer<typeof DatabaseSchemaChangeTypeSchema>;
+export type DatabaseSchemaHistoryEntry = z.infer<typeof DatabaseSchemaHistoryEntrySchema>;
 export type DatabaseQuery = z.infer<typeof DatabaseQuerySchema>;
 export type DatabaseQueryOperation = z.infer<typeof DatabaseQueryOperationSchema>;
 export type DatabaseQueryComplexity = z.infer<typeof DatabaseQueryComplexitySchema>;

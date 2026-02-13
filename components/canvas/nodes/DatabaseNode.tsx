@@ -101,6 +101,7 @@ export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
     monitoring.slaTargets.uptimePercent !== 99.9 ||
     monitoring.slaTargets.maxLatencyMs !== 300;
   const hasSeeds = (dbData.seeds || []).length > 0;
+  const schemaChangeCount = (dbData.schemaHistory || []).length;
   const environmentKeys = ["dev", "staging", "production"] as const;
   const configuredEnvironmentCount = environmentKeys.reduce((count, envKey) => {
     const environmentData = (dbData.environments?.[envKey] || {}) as {
@@ -399,6 +400,20 @@ export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
             }}
           >
             {costEstimate.formattedMonthlyEstimate}
+          </span>
+        )}
+        {schemaChangeCount > 0 && (
+          <span
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 999,
+              padding: "1px 7px",
+              color: "var(--muted)",
+              background: "var(--floating)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            📝 {schemaChangeCount} changes
           </span>
         )}
       </div>
