@@ -315,7 +315,81 @@ export const useStore = create<RFState>((set, get) => {
               constraints: false,
               pagination: true,
             },
+            performance: {
+              connectionPool: {
+                min: 2,
+                max: 20,
+                timeout: 30,
+              },
+              readReplicas: {
+                count: 0,
+                regions: [],
+              },
+              caching: {
+                enabled: false,
+                strategy: "",
+                ttl: 300,
+              },
+              sharding: {
+                enabled: false,
+                strategy: "",
+                partitionKey: "",
+              },
+            },
+            backup: {
+              schedule: "",
+              retention: {
+                days: 7,
+                maxVersions: 30,
+              },
+              pointInTimeRecovery: false,
+              multiRegion: {
+                enabled: false,
+                regions: [],
+              },
+            },
+            costEstimation: {
+              storageGb: 0,
+              estimatedIOPS: 0,
+              backupSizeGb: 0,
+              replicaCount: 0,
+            },
+            security: {
+              roles: [],
+              encryption: {
+                atRest: false,
+                inTransit: false,
+              },
+              network: {
+                vpcId: "",
+                allowedIPs: [],
+              },
+              auditLogging: false,
+            },
+            monitoring: {
+              thresholds: {
+                cpuPercent: 80,
+                memoryPercent: 80,
+                connectionCount: 200,
+                queryLatencyMs: 250,
+              },
+              alerts: [],
+              slaTargets: {
+                uptimePercent: 99.9,
+                maxLatencyMs: 300,
+              },
+            },
             schemas: [],
+            tables: [],
+            queries: [],
+            seeds: [],
+            migrations: [],
+            relationships: [],
+            queryWorkbench: {
+              query: "",
+              ormTarget: "prisma",
+              mockRows: 5,
+            },
             description: "",
           },
         },

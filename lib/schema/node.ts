@@ -163,6 +163,200 @@ export const DatabaseCapabilitiesSchema = z.object({
   pagination: z.boolean(),
 });
 
+export const DatabasePerformanceSchema = z.object({
+  connectionPool: z.object({
+    min: z.number().default(2),
+    max: z.number().default(20),
+    timeout: z.number().default(30),
+  }),
+  readReplicas: z.object({
+    count: z.number().default(0),
+    regions: z.array(z.string()).default([]),
+  }),
+  caching: z.object({
+    enabled: z.boolean().default(false),
+    strategy: z.string().default(""),
+    ttl: z.number().default(300),
+  }),
+  sharding: z.object({
+    enabled: z.boolean().default(false),
+    strategy: z.string().default(""),
+    partitionKey: z.string().default(""),
+  }),
+});
+
+export const DatabaseBackupSchema = z.object({
+  schedule: z.string().default(""),
+  retention: z.object({
+    days: z.number().default(7),
+    maxVersions: z.number().default(30),
+  }),
+  pointInTimeRecovery: z.boolean().default(false),
+  multiRegion: z.object({
+    enabled: z.boolean().default(false),
+    regions: z.array(z.string()).default([]),
+  }),
+});
+
+export const DatabaseCostEstimationSchema = z.object({
+  storageGb: z.number().default(0),
+  estimatedIOPS: z.number().default(0),
+  backupSizeGb: z.number().default(0),
+  replicaCount: z.number().default(0),
+});
+
+export const DatabaseSecuritySchema = z.object({
+  roles: z
+    .array(
+      z.object({
+        name: z.string(),
+        permissions: z.array(z.string()).default([]),
+      }),
+    )
+    .default([]),
+  encryption: z.object({
+    atRest: z.boolean().default(false),
+    inTransit: z.boolean().default(false),
+  }),
+  network: z.object({
+    vpcId: z.string().default(""),
+    allowedIPs: z.array(z.string()).default([]),
+  }),
+  auditLogging: z.boolean().default(false),
+});
+
+export const DatabaseMonitoringSchema = z.object({
+  thresholds: z.object({
+    cpuPercent: z.number().default(80),
+    memoryPercent: z.number().default(80),
+    connectionCount: z.number().default(200),
+    queryLatencyMs: z.number().default(250),
+  }),
+  alerts: z
+    .array(
+      z.object({
+        condition: z.string(),
+        channel: z.string(),
+        recipients: z.array(z.string()).default([]),
+      }),
+    )
+    .default([]),
+  slaTargets: z.object({
+    uptimePercent: z.number().default(99.9),
+    maxLatencyMs: z.number().default(300),
+  }),
+});
+
+export const DatabaseOrmTargetSchema = z.enum([
+  "prisma",
+  "typeorm",
+  "mongoose",
+]);
+
+export const DatabaseFieldTypeSchema = z.enum([
+  "string",
+  "number",
+  "date",
+  "text",
+  "int",
+  "bigint",
+  "float",
+  "decimal",
+  "boolean",
+  "datetime",
+  "json",
+  "uuid",
+]);
+
+export const DatabaseRelationTypeSchema = z.enum([
+  "one_to_one",
+  "one_to_many",
+  "many_to_many",
+]);
+
+export const DatabaseQueryOperationSchema = z.enum([
+  "SELECT",
+  "INSERT",
+  "UPDATE",
+  "DELETE",
+]);
+
+export const DatabaseSeedStrategySchema = z.enum([
+  "random",
+  "fixture",
+  "custom",
+]);
+
+export const DatabaseQuerySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  operation: DatabaseQueryOperationSchema,
+  target: z.string(),
+  conditions: z.string().default(""),
+  generatedCode: z.string().default(""),
+});
+
+export const DatabaseMigrationSchema = z.object({
+  version: z.string(),
+  timestamp: z.string(),
+  description: z.string().default(""),
+  upScript: z.string().default(""),
+  downScript: z.string().default(""),
+  applied: z.boolean().default(false),
+});
+
+export const DatabaseSeedSchema = z.object({
+  tableName: z.string(),
+  rowCount: z.number().default(10),
+  strategy: DatabaseSeedStrategySchema.default("random"),
+  fixtureData: z.array(z.record(z.string(), z.unknown())).default([]),
+  customScript: z.string().default(""),
+});
+
+export const DatabaseTableFieldSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  type: DatabaseFieldTypeSchema,
+  nullable: z.boolean().optional(),
+  defaultValue: z.string().optional(),
+  isPrimaryKey: z.boolean().optional(),
+  isForeignKey: z.boolean().optional(),
+  references: z
+    .object({
+      table: z.string(),
+      field: z.string(),
+    })
+    .optional(),
+  // Legacy fields kept for backward compatibility.
+  required: z.boolean().optional(),
+  unique: z.boolean().optional(),
+  primaryKey: z.boolean().optional(),
+});
+
+export const DatabaseTableSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  fields: z.array(DatabaseTableFieldSchema).default([]),
+  indexes: z.array(z.string()).optional(),
+});
+
+export const DatabaseRelationshipSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  type: DatabaseRelationTypeSchema,
+  fromTableId: z.string(),
+  toTableId: z.string(),
+  fromFieldId: z.string().optional(),
+  toFieldId: z.string().optional(),
+  onDelete: z.enum(["cascade", "restrict", "set_null", "no_action"]).default("no_action"),
+});
+
+export const DatabaseQueryWorkbenchSchema = z.object({
+  query: z.string().default(""),
+  ormTarget: DatabaseOrmTargetSchema.default("prisma"),
+  mockRows: z.number().min(1).max(50).default(5),
+});
+
 export const DatabaseBlockSchema = z.object({
   kind: z.literal("database"),
   id: z.string(),
@@ -170,7 +364,55 @@ export const DatabaseBlockSchema = z.object({
   dbType: DatabaseTypeSchema,
   engine: z.string().optional(),
   capabilities: DatabaseCapabilitiesSchema,
+  performance: DatabasePerformanceSchema.default({
+    connectionPool: { min: 2, max: 20, timeout: 30 },
+    readReplicas: { count: 0, regions: [] },
+    caching: { enabled: false, strategy: "", ttl: 300 },
+    sharding: { enabled: false, strategy: "", partitionKey: "" },
+  }),
+  backup: DatabaseBackupSchema.default({
+    schedule: "",
+    retention: { days: 7, maxVersions: 30 },
+    pointInTimeRecovery: false,
+    multiRegion: { enabled: false, regions: [] },
+  }),
+  costEstimation: DatabaseCostEstimationSchema.default({
+    storageGb: 0,
+    estimatedIOPS: 0,
+    backupSizeGb: 0,
+    replicaCount: 0,
+  }),
+  security: DatabaseSecuritySchema.default({
+    roles: [],
+    encryption: { atRest: false, inTransit: false },
+    network: { vpcId: "", allowedIPs: [] },
+    auditLogging: false,
+  }),
+  monitoring: DatabaseMonitoringSchema.default({
+    thresholds: {
+      cpuPercent: 80,
+      memoryPercent: 80,
+      connectionCount: 200,
+      queryLatencyMs: 250,
+    },
+    alerts: [],
+    slaTargets: {
+      uptimePercent: 99.9,
+      maxLatencyMs: 300,
+    },
+  }),
+  loadedTemplate: z.string().optional(),
   schemas: z.array(z.string()).default([]),
+  tables: z.array(DatabaseTableSchema).default([]),
+  queries: z.array(DatabaseQuerySchema).default([]),
+  seeds: z.array(DatabaseSeedSchema).default([]),
+  migrations: z.array(DatabaseMigrationSchema).default([]),
+  relationships: z.array(DatabaseRelationshipSchema).default([]),
+  queryWorkbench: DatabaseQueryWorkbenchSchema.default({
+    query: "",
+    ormTarget: "prisma",
+    mockRows: 5,
+  }),
   description: z.string().optional(),
 });
 
@@ -758,6 +1000,18 @@ export type ProcessNode = z.infer<typeof ProcessNodeSchema>;
 export type NodeData = z.infer<typeof NodeDataSchema>;
 export type ProcessDefinition = z.infer<typeof ProcessDefinitionSchema>;
 export type DatabaseBlock = z.infer<typeof DatabaseBlockSchema>;
+export type DatabaseTable = z.infer<typeof DatabaseTableSchema>;
+export type DatabaseTableField = z.infer<typeof DatabaseTableFieldSchema>;
+export type DatabaseRelationship = z.infer<typeof DatabaseRelationshipSchema>;
+export type DatabaseFieldType = z.infer<typeof DatabaseFieldTypeSchema>;
+export type DatabaseRelationType = z.infer<typeof DatabaseRelationTypeSchema>;
+export type DatabaseQuery = z.infer<typeof DatabaseQuerySchema>;
+export type DatabaseQueryOperation = z.infer<typeof DatabaseQueryOperationSchema>;
+export type DatabaseSeed = z.infer<typeof DatabaseSeedSchema>;
+export type DatabaseSeedStrategy = z.infer<typeof DatabaseSeedStrategySchema>;
+export type DatabaseMigration = z.infer<typeof DatabaseMigrationSchema>;
+export type DatabaseOrmTarget = z.infer<typeof DatabaseOrmTargetSchema>;
+export type DatabaseQueryWorkbench = z.infer<typeof DatabaseQueryWorkbenchSchema>;
 export type QueueBlock = z.infer<typeof QueueBlockSchema>;
 export type InfraBlock = z.infer<typeof InfraBlockSchema>;
 export type InfraResourceType = z.infer<typeof InfraResourceTypeSchema>;

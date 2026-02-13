@@ -1,9 +1,25 @@
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { DatabaseBlock } from "@/lib/schema/node";
+import { estimateDatabaseMonthlyCost } from "@/lib/cost-estimator";
+import { analyzeDBConnections } from "@/lib/schema/graph";
+import { useStore } from "@/store/useStore";
 
-export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
+export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
   const dbData = data as unknown as DatabaseBlock;
+  const nodes = useStore((state) => state.nodes);
+  const edges = useStore((state) => state.edges);
+  const dbConnectionSummary = useMemo(() => {
+    const analysis = analyzeDBConnections({
+      nodes: nodes as Array<{
+        id: string;
+        type?: string;
+        data?: Record<string, unknown>;
+      }>,
+      edges: edges as Array<{ source: string; target: string }>,
+    });
+    return analysis[id] || null;
+  }, [edges, id, nodes]);
 
   const engineColors: Record<string, string> = {
     postgres: "#336791",
@@ -16,6 +32,75 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
   const enabledCapabilities = Object.entries(dbData.capabilities)
     .filter(([, enabled]) => enabled)
     .map(([name]) => name);
+  const performance = dbData.performance || {
+    connectionPool: { min: 2, max: 20, timeout: 30 },
+    readReplicas: { count: 0, regions: [] },
+    caching: { enabled: false, strategy: "", ttl: 300 },
+    sharding: { enabled: false, strategy: "", partitionKey: "" },
+  };
+  const advancedPerformanceEnabled =
+    performance.readReplicas.count > 0 ||
+    performance.caching.enabled ||
+    performance.sharding.enabled;
+  const backup = dbData.backup || {
+    schedule: "",
+    retention: { days: 7, maxVersions: 30 },
+    pointInTimeRecovery: false,
+    multiRegion: { enabled: false, regions: [] },
+  };
+  const backupConfigured =
+    Boolean(backup.schedule) ||
+    backup.pointInTimeRecovery ||
+    (backup.multiRegion.enabled && backup.multiRegion.regions.length > 0);
+  const security = dbData.security || {
+    roles: [],
+    encryption: { atRest: false, inTransit: false },
+    network: { vpcId: "", allowedIPs: [] },
+    auditLogging: false,
+  };
+  const encryptionEnabled =
+    security.encryption.atRest || security.encryption.inTransit;
+  const loadedTemplate = dbData.loadedTemplate || "";
+  const migrations = dbData.migrations || [];
+  const appliedMigrations = migrations.filter((migration) => migration.applied);
+  const currentSchemaVersion =
+    appliedMigrations[appliedMigrations.length - 1]?.version ||
+    migrations[migrations.length - 1]?.version ||
+    "";
+  const costEstimation = dbData.costEstimation || {
+    storageGb: 0,
+    estimatedIOPS: 0,
+    backupSizeGb: 0,
+    replicaCount: 0,
+  };
+  const costEstimate = estimateDatabaseMonthlyCost(dbData.engine, costEstimation);
+  const costConfigured =
+    costEstimation.storageGb > 0 ||
+    costEstimation.estimatedIOPS > 0 ||
+    costEstimation.backupSizeGb > 0 ||
+    costEstimation.replicaCount > 0;
+  const monitoring = dbData.monitoring || {
+    thresholds: {
+      cpuPercent: 80,
+      memoryPercent: 80,
+      connectionCount: 200,
+      queryLatencyMs: 250,
+    },
+    alerts: [],
+    slaTargets: {
+      uptimePercent: 99.9,
+      maxLatencyMs: 300,
+    },
+  };
+  const monitoringConfigured =
+    (monitoring.alerts || []).length > 0 ||
+    monitoring.thresholds.cpuPercent !== 80 ||
+    monitoring.thresholds.memoryPercent !== 80 ||
+    monitoring.thresholds.connectionCount !== 200 ||
+    monitoring.thresholds.queryLatencyMs !== 250 ||
+    monitoring.slaTargets.uptimePercent !== 99.9 ||
+    monitoring.slaTargets.maxLatencyMs !== 300;
+  const hasSeeds = (dbData.seeds || []).length > 0;
 
   return (
     <div
@@ -55,9 +140,45 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
         >
           {dbData.dbType.toUpperCase()}
         </span>
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.92)" }}>
+          {encryptionEnabled ? "🔒" : "🔓"}
+        </span>
+        {monitoringConfigured && (
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.92)" }}>📊</span>
+        )}
+        {hasSeeds && (
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.92)" }}>🌱</span>
+        )}
         {dbData.engine && (
           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)" }}>
             {dbData.engine}
+          </span>
+        )}
+        {advancedPerformanceEnabled && (
+          <span
+            style={{
+              marginLeft: "auto",
+              border: "1px solid rgba(255,255,255,0.35)",
+              borderRadius: 999,
+              padding: "1px 6px",
+              fontSize: 9,
+              color: "rgba(255,255,255,0.9)",
+            }}
+          >
+            PERF
+          </span>
+        )}
+        {backupConfigured && (
+          <span
+            style={{
+              border: "1px solid rgba(255,255,255,0.35)",
+              borderRadius: 999,
+              padding: "1px 6px",
+              fontSize: 9,
+              color: "rgba(255,255,255,0.9)",
+            }}
+          >
+            BACKUP
           </span>
         )}
       </div>
@@ -81,6 +202,37 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
         {dbData.description && (
           <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
             {dbData.description}
+          </div>
+        )}
+        {loadedTemplate && (
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 10,
+              color: "var(--secondary)",
+              border: "1px solid var(--border)",
+              borderRadius: 999,
+              padding: "2px 8px",
+              display: "inline-flex",
+            }}
+          >
+            Template: {loadedTemplate}
+          </div>
+        )}
+        {currentSchemaVersion && (
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 10,
+              color: "var(--muted)",
+              border: "1px solid var(--border)",
+              borderRadius: 999,
+              padding: "2px 8px",
+              display: "inline-flex",
+              marginLeft: 6,
+            }}
+          >
+            Schema {currentSchemaVersion}
           </div>
         )}
       </div>
@@ -168,6 +320,60 @@ export const DatabaseNode = memo(({ data, selected }: NodeProps) => {
           ))}
         </div>
       )}
+
+      <div
+        style={{
+          padding: "8px 12px",
+          borderTop: "1px solid var(--border)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 10,
+          color: "var(--muted)",
+        }}
+      >
+        <span
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 999,
+            padding: "1px 7px",
+            background: "var(--floating)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          📋 {dbData.tables?.length || 0} tables
+        </span>
+        <span>Relations: {dbData.relationships?.length || 0}</span>
+        {dbConnectionSummary && (
+          <span
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 999,
+              padding: "1px 7px",
+              color: "var(--muted)",
+              background: "var(--floating)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {dbConnectionSummary.connectionCount} connections
+          </span>
+        )}
+        {costConfigured && (
+          <span
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 999,
+              padding: "1px 7px",
+              color: "var(--muted)",
+              background: "var(--floating)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {costEstimate.formattedMonthlyEstimate}
+          </span>
+        )}
+      </div>
 
       {/* Handles */}
       <Handle
