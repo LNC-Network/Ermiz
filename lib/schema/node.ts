@@ -229,6 +229,28 @@ export const DatabaseSecuritySchema = z.object({
   auditLogging: z.boolean().default(false),
 });
 
+export const DatabaseMonitoringSchema = z.object({
+  thresholds: z.object({
+    cpuPercent: z.number().default(80),
+    memoryPercent: z.number().default(80),
+    connectionCount: z.number().default(200),
+    queryLatencyMs: z.number().default(250),
+  }),
+  alerts: z
+    .array(
+      z.object({
+        condition: z.string(),
+        channel: z.string(),
+        recipients: z.array(z.string()).default([]),
+      }),
+    )
+    .default([]),
+  slaTargets: z.object({
+    uptimePercent: z.number().default(99.9),
+    maxLatencyMs: z.number().default(300),
+  }),
+});
+
 export const DatabaseOrmTargetSchema = z.enum([
   "prisma",
   "typeorm",
@@ -268,6 +290,15 @@ export const DatabaseQuerySchema = z.object({
   target: z.string(),
   conditions: z.string().default(""),
   generatedCode: z.string().default(""),
+});
+
+export const DatabaseMigrationSchema = z.object({
+  version: z.string(),
+  timestamp: z.string(),
+  description: z.string().default(""),
+  upScript: z.string().default(""),
+  downScript: z.string().default(""),
+  applied: z.boolean().default(false),
 });
 
 export const DatabaseTableFieldSchema = z.object({
@@ -345,10 +376,24 @@ export const DatabaseBlockSchema = z.object({
     network: { vpcId: "", allowedIPs: [] },
     auditLogging: false,
   }),
+  monitoring: DatabaseMonitoringSchema.default({
+    thresholds: {
+      cpuPercent: 80,
+      memoryPercent: 80,
+      connectionCount: 200,
+      queryLatencyMs: 250,
+    },
+    alerts: [],
+    slaTargets: {
+      uptimePercent: 99.9,
+      maxLatencyMs: 300,
+    },
+  }),
   loadedTemplate: z.string().optional(),
   schemas: z.array(z.string()).default([]),
   tables: z.array(DatabaseTableSchema).default([]),
   queries: z.array(DatabaseQuerySchema).default([]),
+  migrations: z.array(DatabaseMigrationSchema).default([]),
   relationships: z.array(DatabaseRelationshipSchema).default([]),
   queryWorkbench: DatabaseQueryWorkbenchSchema.default({
     query: "",
@@ -658,6 +703,7 @@ export type DatabaseFieldType = z.infer<typeof DatabaseFieldTypeSchema>;
 export type DatabaseRelationType = z.infer<typeof DatabaseRelationTypeSchema>;
 export type DatabaseQuery = z.infer<typeof DatabaseQuerySchema>;
 export type DatabaseQueryOperation = z.infer<typeof DatabaseQueryOperationSchema>;
+export type DatabaseMigration = z.infer<typeof DatabaseMigrationSchema>;
 export type DatabaseOrmTarget = z.infer<typeof DatabaseOrmTargetSchema>;
 export type DatabaseQueryWorkbench = z.infer<typeof DatabaseQueryWorkbenchSchema>;
 export type QueueBlock = z.infer<typeof QueueBlockSchema>;

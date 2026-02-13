@@ -335,9 +335,23 @@ export const useStore = create<RFState>((set, get) => {
               },
               auditLogging: false,
             },
+            monitoring: {
+              thresholds: {
+                cpuPercent: 80,
+                memoryPercent: 80,
+                connectionCount: 200,
+                queryLatencyMs: 250,
+              },
+              alerts: [],
+              slaTargets: {
+                uptimePercent: 99.9,
+                maxLatencyMs: 300,
+              },
+            },
             schemas: [],
             tables: [],
             queries: [],
+            migrations: [],
             relationships: [],
             queryWorkbench: {
               query: "",
