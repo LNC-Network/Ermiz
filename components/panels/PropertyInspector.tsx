@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -8,6 +8,8 @@ import {
   ProcessDefinition,
   DatabaseBlock,
   DatabaseMigration,
+  DatabaseRelationshipSchema,
+  DatabaseTableSchema,
   DatabaseTable,
   DatabaseTableField,
   QueueBlock,
@@ -225,6 +227,11 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
   const [alertConditionDraft, setAlertConditionDraft] = useState("");
   const [alertChannelDraft, setAlertChannelDraft] = useState("email");
   const [alertRecipientsDraft, setAlertRecipientsDraft] = useState("");
+  const [schemaToastMessage, setSchemaToastMessage] = useState("");
+  const [schemaToastType, setSchemaToastType] = useState<"success" | "error">(
+    "success",
+  );
+  const schemaImportInputRef = useRef<HTMLInputElement | null>(null);
   const [requestTab, setRequestTab] = useState<"body" | "headers" | "query">(
     "body",
   );
@@ -415,6 +422,190 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
   const updateDatabaseMigrations = (migrations: DatabaseMigration[]) => {
     if (!databaseNodeData) return;
     handleUpdate({ migrations } as Partial<DatabaseBlock>);
+  };
+
+  const showSchemaToast = (message: string, type: "success" | "error") => {
+    setSchemaToastMessage(message);
+    setSchemaToastType(type);
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => setSchemaToastMessage(""), 2200);
+    }
+  };
+
+  const triggerSchemaExport = () => {
+    if (!databaseNodeData || typeof window === "undefined") return;
+    const payload = {
+      dbType: databaseNodeData.dbType,
+      engine: databaseNodeData.engine || "",
+      schemas: databaseNodeData.schemas || [],
+      tables: databaseNodeData.tables || [],
+      relationships: databaseNodeData.relationships || [],
+      capabilities: databaseNodeData.capabilities,
+      performance: databaseNodeData.performance,
+      backup: databaseNodeData.backup,
+      security: databaseNodeData.security,
+      monitoring: databaseNodeData.monitoring,
+      costEstimation: databaseNodeData.costEstimation,
+      migrations: databaseNodeData.migrations || [],
+      queries: databaseNodeData.queries || [],
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${databaseNodeData.label || "database"}-schema.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    showSchemaToast("Schema exported.", "success");
+  };
+
+  const mapFieldTypeToSql = (
+    fieldType: string,
+    dialect: "postgresql" | "mysql" | "sqlite",
+  ): string => {
+    if (dialect === "sqlite") {
+      if (fieldType === "boolean") return "INTEGER";
+      if (fieldType === "json") return "TEXT";
+      if (fieldType === "date") return "TEXT";
+      if (fieldType === "number") return "REAL";
+      if (fieldType === "int" || fieldType === "bigint") return "INTEGER";
+      return "TEXT";
+    }
+    if (dialect === "mysql") {
+      if (fieldType === "number") return "DOUBLE";
+      if (fieldType === "date") return "DATETIME";
+      if (fieldType === "json") return "JSON";
+      if (fieldType === "string") return "VARCHAR(255)";
+      if (fieldType === "boolean") return "BOOLEAN";
+      if (fieldType === "int") return "INT";
+      if (fieldType === "bigint") return "BIGINT";
+      if (fieldType === "float") return "FLOAT";
+      if (fieldType === "decimal") return "DECIMAL(10,2)";
+      if (fieldType === "uuid") return "CHAR(36)";
+      return "TEXT";
+    }
+    if (fieldType === "number") return "DOUBLE PRECISION";
+    if (fieldType === "date") return "TIMESTAMP";
+    if (fieldType === "json") return "JSONB";
+    if (fieldType === "string") return "VARCHAR(255)";
+    if (fieldType === "boolean") return "BOOLEAN";
+    if (fieldType === "int") return "INTEGER";
+    if (fieldType === "bigint") return "BIGINT";
+    if (fieldType === "float") return "REAL";
+    if (fieldType === "decimal") return "DECIMAL(10,2)";
+    if (fieldType === "uuid") return "UUID";
+    return "TEXT";
+  };
+
+  const triggerDDLExport = () => {
+    if (!databaseNodeData || typeof window === "undefined") return;
+
+    const dbType = databaseNodeData.dbType;
+    const engine = (databaseNodeData.engine || "").toLowerCase();
+    const dialect: "postgresql" | "mysql" | "sqlite" = engine.includes("mysql")
+      ? "mysql"
+      : engine.includes("sqlite")
+        ? "sqlite"
+        : "postgresql";
+
+    let output = "";
+    if (dbType === "sql") {
+      const tables = databaseNodeData.tables || [];
+      output = tables
+        .map((table) => {
+          const fieldLines = (table.fields || []).map((field) => {
+            const parts: string[] = [
+              `"${field.name}"`,
+              mapFieldTypeToSql(String(field.type || "string"), dialect),
+            ];
+            if (field.nullable === false) parts.push("NOT NULL");
+            if (field.defaultValue) parts.push(`DEFAULT ${field.defaultValue}`);
+            return parts.join(" ");
+          });
+          const primaryKeys = (table.fields || [])
+            .filter((field) => field.isPrimaryKey)
+            .map((field) => `"${field.name}"`);
+          if (primaryKeys.length > 0) {
+            fieldLines.push(`PRIMARY KEY (${primaryKeys.join(", ")})`);
+          }
+          return `CREATE TABLE "${table.name}" (\n  ${fieldLines.join(",\n  ")}\n);`;
+        })
+        .join("\n\n");
+    } else if (dbType === "nosql") {
+      output = (databaseNodeData.tables || [])
+        .map((table) => {
+          const fields = (table.fields || [])
+            .map((field) => `  ${field.name}: ${field.type}`)
+            .join("\n");
+          return `collection ${table.name} {\n${fields}\n}`;
+        })
+        .join("\n\n");
+    } else if (dbType === "kv") {
+      output = (databaseNodeData.tables || [])
+        .map((table) => `keyspace ${table.name} // fields: ${(table.fields || []).map((f) => f.name).join(", ")}`)
+        .join("\n");
+    } else {
+      output = (databaseNodeData.relationships || [])
+        .map(
+          (rel) =>
+            `(${rel.fromTableId})-[:${rel.type.toUpperCase()}]->(${rel.toTableId})`,
+        )
+        .join("\n");
+    }
+
+    const blob = new Blob([output || "-- No schema data --"], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download =
+      dbType === "sql"
+        ? `${databaseNodeData.label || "database"}-${dialect}.sql`
+        : `${databaseNodeData.label || "database"}-schema.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    showSchemaToast("Schema exported as DDL.", "success");
+  };
+
+  const handleSchemaImportFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = String(reader.result || "");
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        const tablesCandidate = parsed.tables;
+        const relationshipsCandidate = parsed.relationships;
+        const tableValidation = DatabaseTableSchema.array().safeParse(
+          tablesCandidate,
+        );
+        if (!tableValidation.success) {
+          showSchemaToast("Invalid schema: tables validation failed.", "error");
+          return;
+        }
+        const relationshipValidation = DatabaseRelationshipSchema.array().safeParse(
+          relationshipsCandidate || [],
+        );
+        if (!relationshipValidation.success) {
+          showSchemaToast(
+            "Invalid schema: relationships validation failed.",
+            "error",
+          );
+          return;
+        }
+        handleUpdate({
+          tables: tableValidation.data,
+          relationships: relationshipValidation.data,
+          schemas: tableValidation.data.map((table) => table.name),
+        } as Partial<DatabaseBlock>);
+        showSchemaToast("Schema imported.", "success");
+      } catch {
+        showSchemaToast("Invalid JSON file.", "error");
+      }
+    };
+    reader.readAsText(file);
   };
 
   const exportMigrationsAsFiles = () => {
@@ -828,6 +1019,54 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                   <div style={{ display: "flex", gap: 6 }}>
                     <button
                       type="button"
+                      onClick={triggerSchemaExport}
+                      title="Export Schema"
+                      style={{
+                        border: "1px solid var(--border)",
+                        background: "var(--floating)",
+                        color: "var(--foreground)",
+                        borderRadius: 4,
+                        padding: "4px 7px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ⭳
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => schemaImportInputRef.current?.click()}
+                      title="Import Schema"
+                      style={{
+                        border: "1px solid var(--border)",
+                        background: "var(--floating)",
+                        color: "var(--foreground)",
+                        borderRadius: 4,
+                        padding: "4px 7px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ⭱
+                    </button>
+                    <button
+                      type="button"
+                      onClick={triggerDDLExport}
+                      title="Export as SQL DDL"
+                      style={{
+                        border: "1px solid var(--border)",
+                        background: "var(--floating)",
+                        color: "var(--foreground)",
+                        borderRadius: 4,
+                        padding: "4px 7px",
+                        fontSize: 11,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🧾
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setShowERD((prev) => !prev)}
                       style={{
                         border: "1px solid var(--border)",
@@ -858,6 +1097,33 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
                     </button>
                   </div>
                 </div>
+                <input
+                  ref={schemaImportInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleSchemaImportFile(file);
+                    e.currentTarget.value = "";
+                  }}
+                  style={{ display: "none" }}
+                />
+
+                {schemaToastMessage && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color:
+                        schemaToastType === "success" ? "var(--secondary)" : "#fca5a5",
+                      border: "1px solid var(--border)",
+                      borderRadius: 4,
+                      background: "var(--panel)",
+                      padding: "4px 6px",
+                    }}
+                  >
+                    {schemaToastMessage}
+                  </div>
+                )}
 
                 {showERD && (
                   <DatabaseERDViewer
