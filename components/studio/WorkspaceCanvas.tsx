@@ -222,7 +222,7 @@ export function WorkspaceCanvas({
   }, []);
 
   return (
-    <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
+    <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden", position: "relative" }}>
       {isNarrowViewport && (!isLeftSidebarCollapsed || !isInspectorCollapsed) && (
         <button
           type="button"
@@ -328,6 +328,8 @@ export function WorkspaceCanvas({
             left: 0,
             bottom: isNarrowViewport ? 0 : undefined,
             display: "flex",
+            height: isNarrowViewport ? undefined : "100%",
+            minHeight: 0,
             zIndex: isNarrowViewport ? 26 : 20,
           }}
         >
