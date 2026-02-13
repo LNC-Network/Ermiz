@@ -55,29 +55,11 @@ export function WorkspaceCanvas({
     Record<string, boolean>
   >({});
   const [componentSearch, setComponentSearch] = useState("");
-  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const isNarrow = window.matchMedia("(max-width: 1024px)").matches;
-    if (isNarrow) return true;
-    return localStorage.getItem(STORAGE_KEYS.leftSidebarCollapsed) === "1";
-  });
-  const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const isNarrow = window.matchMedia("(max-width: 1024px)").matches;
-    if (isNarrow) return true;
-    return localStorage.getItem(STORAGE_KEYS.rightSidebarCollapsed) === "1";
-  });
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
+  const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState(() => {
-    if (typeof window === "undefined") return DEFAULT_LEFT_WIDTH;
-    const stored = Number(localStorage.getItem(STORAGE_KEYS.leftSidebarWidth));
-    return clampLeftWidth(stored);
-  });
-  const [inspectorWidth, setInspectorWidth] = useState(() => {
-    if (typeof window === "undefined") return DEFAULT_INSPECTOR_WIDTH;
-    const stored = Number(localStorage.getItem(STORAGE_KEYS.inspectorWidth));
-    return clampInspectorWidth(stored);
-  });
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_WIDTH);
+  const [inspectorWidth, setInspectorWidth] = useState(DEFAULT_INSPECTOR_WIDTH);
   const resizeStateRef = useRef<{
     side: "left" | "right" | null;
     startX: number;
@@ -122,6 +104,30 @@ export function WorkspaceCanvas({
         (item.hint?.toLowerCase().includes(query) ?? false),
     );
   }, [componentSearch, flatItems, flatList]);
+
+  useEffect(() => {
+    // Load saved widths and collapsed states from localStorage after mount
+    if (typeof window !== "undefined") {
+      const isNarrow = window.matchMedia("(max-width: 1024px)").matches;
+      
+      const savedLeftCollapsed = localStorage.getItem(STORAGE_KEYS.leftSidebarCollapsed);
+      const savedRightCollapsed = localStorage.getItem(STORAGE_KEYS.rightSidebarCollapsed);
+      
+      if (isNarrow) {
+        setIsLeftSidebarCollapsed(true);
+        setIsInspectorCollapsed(true);
+      } else {
+        if (savedLeftCollapsed === "1") setIsLeftSidebarCollapsed(true);
+        if (savedRightCollapsed === "1") setIsInspectorCollapsed(true);
+      }
+      
+      const storedLeftWidth = Number(localStorage.getItem(STORAGE_KEYS.leftSidebarWidth));
+      if (storedLeftWidth) setLeftSidebarWidth(clampLeftWidth(storedLeftWidth));
+      
+      const storedInspectorWidth = Number(localStorage.getItem(STORAGE_KEYS.inspectorWidth));
+      if (storedInspectorWidth) setInspectorWidth(clampInspectorWidth(storedInspectorWidth));
+    }
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
@@ -353,11 +359,12 @@ export function WorkspaceCanvas({
               width: leftSidebarWidth,
               flexShrink: 0,
               height: "100%",
+              maxHeight: "100%",
               minHeight: 0,
               borderRight: "1px solid var(--border)",
               background: "color-mix(in srgb, var(--panel) 92%, #0b0f16 8%)",
               paddingTop: isNarrowViewport ? 52 : 12,
-              paddingRight: 12,
+              paddingRight: 8,
               paddingBottom: 16,
               paddingLeft: 12,
               display: "flex",

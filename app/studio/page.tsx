@@ -26,21 +26,7 @@ export default function Home() {
   const router = useRouter();
   const setActiveWorkspaceTab = useStore((state) => state.setActiveTab);
   const loadGraphPreset = useStore((state) => state.loadGraphPreset);
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
-    if (typeof window === "undefined") return "api";
-    const savedTab = localStorage.getItem(STORAGE_KEYS.activeTab);
-    if (
-      savedTab === "api" ||
-      savedTab === "infra" ||
-      savedTab === "database" ||
-      savedTab === "functions" ||
-      savedTab === "agent" ||
-      savedTab === "deploy"
-    ) {
-      return savedTab;
-    }
-    return "api";
-  });
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("api");
   const [resetLayoutSignal, setResetLayoutSignal] = useState(0);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -77,6 +63,23 @@ export default function Home() {
   );
 
   const statusText = STATUS_TEXT_BY_TAB[activeTab];
+
+  useEffect(() => {
+    // Load saved tab from localStorage after mount to avoid hydration mismatch
+    if (typeof window !== "undefined") {
+      const savedTab = localStorage.getItem(STORAGE_KEYS.activeTab);
+      if (
+        savedTab === "api" ||
+        savedTab === "infra" ||
+        savedTab === "database" ||
+        savedTab === "functions" ||
+        savedTab === "agent" ||
+        savedTab === "deploy"
+      ) {
+        setActiveTab(savedTab);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {

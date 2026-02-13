@@ -258,6 +258,32 @@ textarea::placeholder {
   scrollbar-color: var(--border-muted) var(--background);
 }
 
+/* Enhanced scrollbar for sidebars */
+aside::-webkit-scrollbar {
+  width: 10px;
+}
+
+aside::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+
+aside::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+aside::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+aside {
+  scrollbar-width: auto;
+  scrollbar-color: var(--border) transparent;
+}
+
 /* ============================================
    Focus & Selection States
    ============================================ */

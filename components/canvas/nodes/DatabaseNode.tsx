@@ -3,6 +3,7 @@ import { Handle, Position, NodeProps } from "@xyflow/react";
 import { DatabaseBlock } from "@/lib/schema/node";
 import { estimateDatabaseMonthlyCost } from "@/lib/cost-estimator";
 import { analyzeDBConnections } from "@/lib/schema/graph";
+import { analyzeDatabaseHealth } from "@/lib/db-health-checker";
 import { useStore } from "@/store/useStore";
 
 export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
@@ -102,6 +103,13 @@ export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
     monitoring.slaTargets.maxLatencyMs !== 300;
   const hasSeeds = (dbData.seeds || []).length > 0;
   const schemaChangeCount = (dbData.schemaHistory || []).length;
+  const healthReport = useMemo(() => analyzeDatabaseHealth(dbData), [dbData]);
+  const healthTone =
+    healthReport.score >= 90
+      ? { icon: "??", color: "#4bbf73" }
+      : healthReport.score >= 70
+        ? { icon: "??", color: "#d8b24a" }
+        : { icon: "??", color: "#d16b6b" };
   const environmentKeys = ["dev", "staging", "production"] as const;
   const configuredEnvironmentCount = environmentKeys.reduce((count, envKey) => {
     const environmentData = (dbData.environments?.[envKey] || {}) as {
@@ -413,9 +421,22 @@ export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
               whiteSpace: "nowrap",
             }}
           >
-            📝 {schemaChangeCount} changes
+            ?? {schemaChangeCount} changes
           </span>
         )}
+        <span
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 999,
+            padding: "1px 7px",
+            color: healthTone.color,
+            background: "var(--floating)",
+            whiteSpace: "nowrap",
+            fontWeight: 600,
+          }}
+        >
+          {healthTone.icon} {healthReport.score}
+        </span>
       </div>
 
       {/* Handles */}
@@ -444,3 +465,5 @@ export const DatabaseNode = memo(({ id, data, selected }: NodeProps) => {
 });
 
 DatabaseNode.displayName = "DatabaseNode";
+
+

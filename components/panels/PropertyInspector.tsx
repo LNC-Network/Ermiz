@@ -44,6 +44,7 @@ import { MonitoringSection } from "./database/MonitoringSection";
 import { ConnectedProcessesSection } from "./database/ConnectedProcessesSection";
 import { MigrationsSection } from "./database/MigrationsSection";
 import { ChangeHistorySection } from "./database/ChangeHistorySection";
+import { HealthCheckSection } from "./database/HealthCheckSection";
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -1683,6 +1684,18 @@ export function PropertyInspector({ width = 320 }: { width?: number }) {
             onChange={(updates) => handleUpdate(updates as Partial<DatabaseBlock>)}
             inputStyle={inputStyle}
             selectStyle={selectStyle}
+            sectionStyle={sectionStyle}
+          />
+          <HealthCheckSection
+            database={nodeData as DatabaseBlock}
+            onChange={(updates) => {
+              if (updates.tables) {
+                const { tables, ...rest } = updates;
+                updateDatabaseTables(tables, rest);
+                return;
+              }
+              handleUpdate(updates as Partial<DatabaseBlock>);
+            }}
             sectionStyle={sectionStyle}
           />
           <div style={sectionStyle}>
