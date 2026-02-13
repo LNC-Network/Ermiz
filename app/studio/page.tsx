@@ -2,7 +2,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { PropertyInspector } from "@/components/panels/PropertyInspector";
+import { supabaseClient } from "@/lib/supabase/client";
 import { useStore } from "@/store/useStore";
 
 const FlowCanvas = dynamic(() => import("@/components/canvas/FlowCanvas"), {
@@ -725,56 +727,749 @@ function AgentWorkspace() {
 }
 
 function DeployWorkspace() {
+  const [platform, setPlatform] = useState("vercel");
+  const [credentialType, setCredentialType] = useState("oauth");
+  const [billingMode, setBillingMode] = useState("platform");
+  const [environment, setEnvironment] = useState("production");
+
+  const platforms = [
+    {
+      id: "vercel",
+      name: "Vercel",
+      desc: "Next.js native, global edge + preview deploys",
+    },
+    {
+      id: "aws",
+      name: "AWS",
+      desc: "ECS / Lambda with private networking controls",
+    },
+    {
+      id: "gcp",
+      name: "Google Cloud",
+      desc: "Cloud Run + Artifact Registry pipelines",
+    },
+    {
+      id: "render",
+      name: "Render",
+      desc: "Simple builds with managed Postgres",
+    },
+    {
+      id: "fly",
+      name: "Fly.io",
+      desc: "Global regions with instant scaling",
+    },
+    {
+      id: "railway",
+      name: "Railway",
+      desc: "Quick services with team billing",
+    },
+  ];
+
+  const actionButtonStyle: React.CSSProperties = {
+    border: "1px solid var(--border)",
+    background: "var(--floating)",
+    color: "var(--foreground)",
+    borderRadius: 8,
+    padding: "8px 12px",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+  };
+
   return (
     <main
       style={{
         flex: 1,
-        display: "grid",
-        placeItems: "center",
-        padding: 16,
+        padding: "18px 20px 28px",
         background: "var(--background)",
+        overflow: "auto",
       }}
     >
-      <section
+      <div
         style={{
-          width: "min(680px, 100%)",
-          border: "1px solid var(--border)",
-          background: "var(--panel)",
-          borderRadius: 12,
-          padding: 20,
+          width: "min(1200px, 100%)",
+          margin: "0 auto",
+          display: "grid",
+          gap: 16,
         }}
       >
-        <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 16 }}>Deploy</h2>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>
-          Deployment controls can be configured here. This tab is ready for
-          pipeline actions such as validate, build, and release.
-        </p>
-      </section>
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            background: "color-mix(in srgb, var(--panel) 92%, #0a0f16 8%)",
+            borderRadius: 14,
+            padding: "18px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>Deployment</div>
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>
+              Configure the platform, credentials, billing, and release pipeline.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" style={actionButtonStyle}>
+              Validate
+            </button>
+            <button
+              type="button"
+              style={{
+                ...actionButtonStyle,
+                background:
+                  "color-mix(in srgb, var(--primary) 20%, var(--panel) 80%)",
+              }}
+            >
+              Build
+            </button>
+            <button
+              type="button"
+              style={{
+                ...actionButtonStyle,
+                background:
+                  "color-mix(in srgb, var(--secondary) 18%, var(--panel) 82%)",
+              }}
+            >
+              Deploy
+            </button>
+            <button type="button" style={actionButtonStyle}>
+              Rollback
+            </button>
+          </div>
+        </section>
+
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--panel)",
+            borderRadius: 14,
+            padding: 16,
+            display: "grid",
+            gap: 14,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Choose Platform</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {platforms.map((item) => {
+              const isActive = platform === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setPlatform(item.id)}
+                  style={{
+                    border: "1px solid var(--border)",
+                    background: isActive
+                      ? "color-mix(in srgb, var(--primary) 18%, var(--panel) 82%)"
+                      : "color-mix(in srgb, var(--floating) 94%, #0b0f16 6%)",
+                    borderRadius: 12,
+                    padding: "12px 14px",
+                    textAlign: "left",
+                    cursor: "pointer",
+                    boxShadow: isActive ? "var(--shadow-soft)" : "none",
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{item.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>
+                    {item.desc}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 10,
+            }}
+          >
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 12,
+                background: "var(--floating)",
+              }}
+            >
+              <div style={{ fontSize: 12, marginBottom: 8 }}>Environment</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {["production", "staging", "preview"].map((env) => (
+                  <button
+                    key={env}
+                    type="button"
+                    onClick={() => setEnvironment(env)}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 999,
+                      padding: "5px 10px",
+                      fontSize: 11,
+                      cursor: "pointer",
+                      background:
+                        environment === env
+                          ? "color-mix(in srgb, var(--panel) 80%, #141a24 20%)"
+                          : "transparent",
+                      color:
+                        environment === env
+                          ? "var(--foreground)"
+                          : "var(--muted)",
+                    }}
+                  >
+                    {env}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 12,
+                background: "var(--floating)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 12 }}>Region & Runtime</div>
+              <select
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "6px 8px",
+                  background: "var(--panel)",
+                  color: "var(--foreground)",
+                  fontSize: 12,
+                }}
+                defaultValue="iad"
+              >
+                <option value="iad">US East (IAD)</option>
+                <option value="sfo">US West (SFO)</option>
+                <option value="lon">EU West (LON)</option>
+                <option value="sin">Asia Pacific (SIN)</option>
+              </select>
+              <select
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "6px 8px",
+                  background: "var(--panel)",
+                  color: "var(--foreground)",
+                  fontSize: 12,
+                }}
+                defaultValue="node"
+              >
+                <option value="node">Node.js 20</option>
+                <option value="edge">Edge Runtime</option>
+                <option value="docker">Docker Container</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--panel)",
+            borderRadius: 14,
+            padding: 16,
+            display: "grid",
+            gap: 12,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600 }}>
+            Credentials & Billing
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[
+              { id: "oauth", label: "OAuth Connection" },
+              { id: "api_key", label: "API Key" },
+              { id: "service_account", label: "Service Account" },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setCredentialType(item.id)}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  fontSize: 11,
+                  cursor: "pointer",
+                  background:
+                    credentialType === item.id
+                      ? "color-mix(in srgb, var(--primary) 18%, var(--panel) 82%)"
+                      : "transparent",
+                  color:
+                    credentialType === item.id
+                      ? "var(--foreground)"
+                      : "var(--muted)",
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {credentialType === "oauth" && (
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 12,
+                background: "var(--floating)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 12 }}>
+                Connect {platforms.find((item) => item.id === platform)?.name}
+              </div>
+              <button
+                type="button"
+                style={{
+                  ...actionButtonStyle,
+                  width: "fit-content",
+                }}
+              >
+                Authorize Workspace
+              </button>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                Last sync: not connected
+              </div>
+            </div>
+          )}
+
+          {credentialType === "api_key" && (
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 12,
+                background: "var(--floating)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <input
+                placeholder="API Key"
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "6px 8px",
+                  background: "var(--panel)",
+                  color: "var(--foreground)",
+                  fontSize: 12,
+                }}
+              />
+              <input
+                placeholder="Account ID"
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "6px 8px",
+                  background: "var(--panel)",
+                  color: "var(--foreground)",
+                  fontSize: 12,
+                }}
+              />
+              <input
+                placeholder="Project ID"
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "6px 8px",
+                  background: "var(--panel)",
+                  color: "var(--foreground)",
+                  fontSize: 12,
+                }}
+              />
+            </div>
+          )}
+
+          {credentialType === "service_account" && (
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 12,
+                background: "var(--floating)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <textarea
+                placeholder="Paste service account JSON"
+                rows={4}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "8px",
+                  background: "var(--panel)",
+                  color: "var(--foreground)",
+                  fontSize: 12,
+                  resize: "vertical",
+                }}
+              />
+              <input
+                placeholder="Project / Org"
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "6px 8px",
+                  background: "var(--panel)",
+                  color: "var(--foreground)",
+                  fontSize: 12,
+                }}
+              />
+            </div>
+          )}
+
+          <div
+            style={{
+              borderTop: "1px solid var(--border)",
+              paddingTop: 12,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600 }}>Billing</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[
+                { id: "platform", label: "Use Platform Billing" },
+                { id: "card", label: "Add Card" },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setBillingMode(item.id)}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 999,
+                    padding: "6px 12px",
+                    fontSize: 11,
+                    cursor: "pointer",
+                    background:
+                      billingMode === item.id
+                        ? "color-mix(in srgb, var(--secondary) 18%, var(--panel) 82%)"
+                        : "transparent",
+                    color:
+                      billingMode === item.id
+                        ? "var(--foreground)"
+                        : "var(--muted)",
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {billingMode === "card" && (
+              <div
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 12,
+                  padding: 12,
+                  background: "var(--floating)",
+                  display: "grid",
+                  gap: 8,
+                }}
+              >
+                <input
+                  placeholder="Cardholder Name"
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    padding: "6px 8px",
+                    background: "var(--panel)",
+                    color: "var(--foreground)",
+                    fontSize: 12,
+                  }}
+                />
+                <input
+                  placeholder="Card Number"
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    padding: "6px 8px",
+                    background: "var(--panel)",
+                    color: "var(--foreground)",
+                    fontSize: 12,
+                  }}
+                />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <input
+                    placeholder="MM / YY"
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      padding: "6px 8px",
+                      background: "var(--panel)",
+                      color: "var(--foreground)",
+                      fontSize: 12,
+                    }}
+                  />
+                  <input
+                    placeholder="CVC"
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      padding: "6px 8px",
+                      background: "var(--panel)",
+                      color: "var(--foreground)",
+                      fontSize: 12,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--panel)",
+            borderRadius: 14,
+            padding: 16,
+            display: "grid",
+            gap: 12,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Deployment Pipeline</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {[
+              "Generate OpenAPI / AsyncAPI",
+              "Compile runtime artifacts",
+              "Run database migrations",
+              "Seed reference data",
+              "Upload build to artifact registry",
+              "Notify team on release",
+            ].map((item) => (
+              <label
+                key={item}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 12,
+                  color: "var(--muted)",
+                }}
+              >
+                <input type="checkbox" defaultChecked />
+                <span>{item}</span>
+              </label>
+            ))}
+          </div>
+          <div
+            style={{
+              borderTop: "1px solid var(--border)",
+              paddingTop: 12,
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600 }}>Release Controls</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {[
+                "Zero-downtime deployment",
+                "Auto rollback on failed health check",
+                "Canary release (10% traffic)",
+                "Enable preview deployments",
+              ].map((item) => (
+                <label
+                  key={item}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    color: "var(--muted)",
+                  }}
+                >
+                  <input type="checkbox" />
+                  <span>{item}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--panel)",
+            borderRadius: 14,
+            padding: 16,
+            display: "grid",
+            gap: 12,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600 }}>
+            Secrets, Domains, and Observability
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 10,
+            }}
+          >
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 12,
+                background: "var(--floating)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Secrets</div>
+              <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                DATABASE_URL, SUPABASE_KEY, STRIPE_SECRET
+              </div>
+              <button type="button" style={actionButtonStyle}>
+                Add Secret
+              </button>
+            </div>
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 12,
+                background: "var(--floating)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Custom Domain</div>
+              <input
+                placeholder="api.yourdomain.com"
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  padding: "6px 8px",
+                  background: "var(--panel)",
+                  color: "var(--foreground)",
+                  fontSize: 12,
+                }}
+              />
+              <button type="button" style={actionButtonStyle}>
+                Verify DNS
+              </button>
+            </div>
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                padding: 12,
+                background: "var(--floating)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 600 }}>
+                Observability
+              </div>
+              <label style={{ display: "flex", gap: 8, fontSize: 12 }}>
+                <input type="checkbox" defaultChecked />
+                Stream logs to dashboard
+              </label>
+              <label style={{ display: "flex", gap: 8, fontSize: 12 }}>
+                <input type="checkbox" />
+                Enable traces & metrics
+              </label>
+              <label style={{ display: "flex", gap: 8, fontSize: 12 }}>
+                <input type="checkbox" />
+                Alert on error spikes
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--panel)",
+            borderRadius: 14,
+            padding: 16,
+            display: "grid",
+            gap: 12,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Recent Deployments</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {[
+              {
+                id: "rel-322",
+                status: "Live",
+                meta: "Production · US East · 2m ago",
+              },
+              {
+                id: "rel-321",
+                status: "Rolled back",
+                meta: "Production · EU West · 1d ago",
+              },
+              {
+                id: "rel-320",
+                status: "Preview",
+                meta: "Staging · US West · 2d ago",
+              },
+            ].map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  border: "1px solid var(--border)",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "var(--floating)",
+                }}
+              >
+                <div style={{ fontSize: 12 }}>
+                  {item.id} · {item.status}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                  {item.meta}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
 
 export default function Home() {
+  const router = useRouter();
+  const setActiveWorkspaceTab = useStore((state) => state.setActiveTab);
   const loadGraphPreset = useStore((state) => state.loadGraphPreset);
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
-    if (typeof window === "undefined") return "api";
-    const savedTab = localStorage.getItem(STORAGE_KEYS.activeTab);
-    if (
-      savedTab === "api" ||
-      savedTab === "infra" ||
-      savedTab === "database" ||
-      savedTab === "agent" ||
-      savedTab === "deploy"
-    ) {
-      return savedTab;
-    }
-    return "api";
-  });
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("api");
   const [resetLayoutSignal, setResetLayoutSignal] = useState(0);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [commitStatus, setCommitStatus] = useState("Uncommitted changes");
   const [saveState, setSaveState] = useState("Unsaved");
   const profileRef = useRef<HTMLDivElement | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const [user, setUser] = useState<{
+    email?: string | null;
+    user_metadata?: Record<string, unknown> | null;
+    identities?: Array<{ identity_data?: Record<string, unknown> | null }> | null;
+  } | null>(null);
   const creditLimit = 1200;
   const creditUsed = 744;
   const creditUsedPercent = Math.min(
@@ -922,56 +1617,76 @@ export default function Home() {
 
   const infraSections: SidebarSection[] = [
     {
-      id: "infra-core",
-      title: "Infrastructure",
+      id: "infra-compute",
+      title: "Compute",
       items: [
         {
-          kind: "database",
-          label: "Database",
-          icon: "🗄️",
-          hoverColor: "#4ade80",
-          hint: "Primary data service",
+          kind: "infra_ec2",
+          label: "EC2 Instance",
+          icon: "🖥️",
+          hoverColor: "#60a5fa",
+          hint: "Virtual machines + autoscaling",
         },
         {
-          kind: "queue",
-          label: "Queue",
-          icon: "📬",
+          kind: "infra_lambda",
+          label: "Lambda Function",
+          icon: "⚡",
           hoverColor: "#facc15",
-          hint: "Work distribution",
+          hint: "Serverless execution",
         },
         {
-          kind: "queue",
-          label: "Retry Queue",
-          icon: "♻️",
-          hoverColor: "#f59e0b",
-          hint: "Retry/backoff channel",
+          kind: "infra_eks",
+          label: "EKS Cluster",
+          icon: "🧩",
+          hoverColor: "#34d399",
+          hint: "Managed Kubernetes",
+        },
+        {
+          kind: "infra_hpc",
+          label: "HPC Cluster",
+          icon: "🚀",
+          hoverColor: "#f472b6",
+          hint: "Batch compute + schedulers",
         },
       ],
     },
     {
-      id: "infra-flows",
-      title: "Supporting Workflows",
+      id: "infra-network",
+      title: "Networking",
       items: [
         {
-          kind: "process",
-          label: "Infra Process",
-          icon: "⚙️",
+          kind: "infra_vpc",
+          label: "VPC Network",
+          icon: "🧭",
           hoverColor: "#a78bfa",
-          hint: "Provision/maintenance logic",
+          hint: "Subnets, routes, NAT",
         },
         {
-          kind: "process",
-          label: "Migration Runner",
-          icon: "🚚",
-          hoverColor: "#38bdf8",
-          hint: "Schema/data migrations",
+          kind: "infra_lb",
+          label: "Load Balancer",
+          icon: "📡",
+          hoverColor: "#22d3ee",
+          hint: "ALB/NLB listeners + targets",
+        },
+      ],
+    },
+    {
+      id: "infra-storage",
+      title: "Storage",
+      items: [
+        {
+          kind: "infra_s3",
+          label: "S3 Bucket",
+          icon: "🪣",
+          hoverColor: "#f97316",
+          hint: "Object storage",
         },
         {
-          kind: "process",
-          label: "Backup Job",
-          icon: "🛟",
-          hoverColor: "#34d399",
-          hint: "Scheduled backup pipeline",
+          kind: "infra_rds",
+          label: "RDS Instance",
+          icon: "🗄️",
+          hoverColor: "#3b82f6",
+          hint: "Managed relational DB",
         },
       ],
     },
@@ -1060,6 +1775,7 @@ export default function Home() {
         !profileRef.current.contains(event.target)
       ) {
         setIsProfileOpen(false);
+        setIsLoginOpen(false);
       }
     };
     document.addEventListener("mousedown", handleOutsideClick);
@@ -1069,12 +1785,71 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    setAvatarFailed(false);
+  }, [user?.user_metadata, user?.email, user?.identities]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadUser = async () => {
+      try {
+        const { data, error } = await supabaseClient.auth.getUser();
+        if (!isMounted) return;
+        if (error) {
+          setUser(null);
+          return;
+        }
+        setUser(data.user ?? null);
+      } catch {
+        if (!isMounted) return;
+        setUser(null);
+      }
+    };
+
+    loadUser();
+
+    const { data } = supabaseClient.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      isMounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setIsProfileOpen(false);
+    } else {
+      setIsLoginOpen(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const savedTab = localStorage.getItem(STORAGE_KEYS.activeTab);
+    if (
+      savedTab === "api" ||
+      savedTab === "infra" ||
+      savedTab === "database" ||
+      savedTab === "agent" ||
+      savedTab === "deploy"
+    ) {
+      setActiveTab(savedTab);
+    }
+  }, []);
+
+  useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.activeTab, activeTab);
     } catch {
       // ignore storage errors
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    setActiveWorkspaceTab(activeTab);
+  }, [activeTab, setActiveWorkspaceTab]);
 
   const handleSaveChanges = () => {
     setSaveState("Saved");
@@ -1087,6 +1862,62 @@ export default function Home() {
   const handleResetLayout = () => {
     setResetLayoutSignal((prev) => prev + 1);
   };
+
+  const handleLogin = async () => {
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+      "/studio",
+    )}`;
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo },
+    });
+    if (error) {
+      // keep the modal open so the user can retry
+      // optional: surface error in UI later
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch {
+      // ignore auth errors
+    }
+    try {
+      await fetch("/auth/logout", { method: "POST" });
+    } catch {
+      // ignore network errors
+    }
+    setIsProfileOpen(false);
+    setUser(null);
+    router.push("/");
+    router.refresh();
+  };
+
+  const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
+  const identityData =
+    (user?.identities?.[0]?.identity_data ?? {}) as Record<string, unknown>;
+  const displayName =
+    (typeof userMetadata.full_name === "string" && userMetadata.full_name) ||
+    (typeof userMetadata.name === "string" && userMetadata.name) ||
+    (typeof identityData.full_name === "string" && identityData.full_name) ||
+    (typeof identityData.name === "string" && identityData.name) ||
+    user?.email ||
+    "Profile";
+  const displayEmail = user?.email ?? "";
+  const avatarUrl =
+    (typeof userMetadata.avatar_url === "string" && userMetadata.avatar_url) ||
+    (typeof userMetadata.picture === "string" && userMetadata.picture) ||
+    (typeof identityData.avatar_url === "string" && identityData.avatar_url) ||
+    (typeof identityData.picture === "string" && identityData.picture) ||
+    "";
+  const initials =
+    displayName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "U";
 
   return (
     <div
@@ -1224,28 +2055,57 @@ export default function Home() {
           >
             Reset Layout
           </button>
-          <button
-            type="button"
-            onClick={() => setIsProfileOpen((prev) => !prev)}
-            aria-label="Open profile menu"
-            style={{
-              width: 34,
-              height: 34,
-              border: "1px solid var(--border)",
-              background: "var(--floating)",
-              color: "var(--foreground)",
-              borderRadius: "50%",
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 700,
-              display: "grid",
-              placeItems: "center",
-            }}
-          >
-            JS
-          </button>
+          {user ? (
+            <button
+              type="button"
+              onClick={() => setIsProfileOpen((prev) => !prev)}
+              aria-label="Open profile menu"
+              style={{
+                width: 34,
+                height: 34,
+                border: "1px solid var(--border)",
+                background: "var(--floating)",
+                color: "var(--foreground)",
+                borderRadius: "50%",
+                cursor: "pointer",
+                display: "grid",
+                placeItems: "center",
+                overflow: "hidden",
+              }}
+            >
+              {avatarUrl && !avatarFailed ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName}
+                  onError={() => setAvatarFailed(true)}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <span style={{ fontSize: 12, fontWeight: 700 }}>
+                  {initials}
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsLoginOpen((prev) => !prev)}
+              style={{
+                border: "1px solid var(--border)",
+                background: "var(--floating)",
+                color: "var(--foreground)",
+                borderRadius: 999,
+                padding: "6px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Sign in
+            </button>
+          )}
 
-          {isProfileOpen && (
+          {isProfileOpen && user && (
             <div
               style={{
                 position: "absolute",
@@ -1259,19 +2119,27 @@ export default function Home() {
                 padding: 10,
                 zIndex: 20,
               }}
-            >
-              <div
-                style={{
-                  padding: "4px 6px 10px 6px",
-                  borderBottom: "1px solid var(--border)",
-                  marginBottom: 8,
-                }}
               >
-                <div style={{ fontSize: 12, fontWeight: 600 }}>Jitendra</div>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                  Ermiz Studio Workspace
+                <div
+                  style={{
+                    padding: "4px 6px 10px 6px",
+                    borderBottom: "1px solid var(--border)",
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>
+                    {displayName}
+                  </div>
+                  {displayEmail ? (
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                      {displayEmail}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                      Not signed in
+                    </div>
+                  )}
                 </div>
-              </div>
 
               <button
                 type="button"
@@ -1392,6 +2260,25 @@ export default function Home() {
 
               <button
                 type="button"
+                onClick={handleLogout}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  border: "1px solid var(--border)",
+                  background: "var(--floating)",
+                  color: "var(--foreground)",
+                  padding: "8px 10px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  marginBottom: 8,
+                }}
+              >
+                Log out
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   setIsProfileOpen(false);
                   window.alert("Upgrade flow can be connected here.");
@@ -1409,6 +2296,52 @@ export default function Home() {
                 }}
               >
                 Buy Pro
+              </button>
+            </div>
+          )}
+
+          {isLoginOpen && !user && (
+            <div
+              style={{
+                position: "absolute",
+                right: 0,
+                top: "calc(100% + 8px)",
+                width: 260,
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                background: "color-mix(in srgb, var(--panel) 95%, #0a1018 5%)",
+                boxShadow: "var(--shadow-float)",
+                padding: 12,
+                zIndex: 20,
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
+                Sign in
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  marginBottom: 10,
+                }}
+              >
+                Continue with Google to access your workspace.
+              </div>
+              <button
+                onClick={handleLogin}
+                style={{
+                  width: "100%",
+                  border: "1px solid var(--border)",
+                  background: "var(--foreground)",
+                  color: "#0a0a0a",
+                  borderRadius: 8,
+                  padding: "7px 10px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Sign in with Google
               </button>
             </div>
           )}

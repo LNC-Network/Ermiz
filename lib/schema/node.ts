@@ -203,6 +203,166 @@ export const QueueBlockSchema = z.object({
 });
 
 // ============================================
+// Infra Resources (Terraform-aligned)
+// ============================================
+export const InfraProviderSchema = z.enum(["aws", "gcp", "azure", "generic"]);
+export const InfraEnvironmentSchema = z.enum([
+  "production",
+  "staging",
+  "preview",
+  "dev",
+]);
+
+const InfraBaseSchema = z.object({
+  kind: z.literal("infra"),
+  id: z.string(),
+  label: z.string(),
+  description: z.string().optional(),
+  provider: InfraProviderSchema,
+  environment: InfraEnvironmentSchema,
+  region: z.string(),
+  tags: z.array(z.string()).default([]),
+});
+
+export const InfraResourceTypeSchema = z.enum([
+  "ec2",
+  "lambda",
+  "eks",
+  "vpc",
+  "s3",
+  "rds",
+  "load_balancer",
+  "hpc",
+]);
+
+const Ec2ConfigSchema = z.object({
+  instanceType: z.string(),
+  ami: z.string(),
+  count: z.number(),
+  subnetIds: z.string(),
+  securityGroups: z.string(),
+  diskGb: z.number(),
+  autoscalingMin: z.number(),
+  autoscalingMax: z.number(),
+});
+
+const LambdaConfigSchema = z.object({
+  runtime: z.string(),
+  memoryMb: z.number(),
+  timeoutSec: z.number(),
+  handler: z.string(),
+  source: z.string(),
+  trigger: z.string(),
+  environmentVars: z.string(),
+});
+
+const EksConfigSchema = z.object({
+  version: z.string(),
+  nodeType: z.string(),
+  nodeCount: z.number(),
+  minNodes: z.number(),
+  maxNodes: z.number(),
+  vpcId: z.string(),
+  privateSubnets: z.string(),
+  clusterLogs: z.string(),
+});
+
+const VpcConfigSchema = z.object({
+  cidr: z.string(),
+  publicSubnets: z.string(),
+  privateSubnets: z.string(),
+  natGateways: z.number(),
+  flowLogs: z.boolean(),
+});
+
+const S3ConfigSchema = z.object({
+  bucketName: z.string(),
+  versioning: z.boolean(),
+  encryption: z.string(),
+  lifecycle: z.string(),
+  publicAccess: z.string(),
+});
+
+const RdsConfigSchema = z.object({
+  engine: z.string(),
+  engineVersion: z.string(),
+  instanceClass: z.string(),
+  storageGb: z.number(),
+  multiAz: z.boolean(),
+  backupRetentionDays: z.number(),
+  subnetGroup: z.string(),
+});
+
+const LoadBalancerConfigSchema = z.object({
+  lbType: z.string(),
+  scheme: z.string(),
+  listeners: z.string(),
+  targetGroup: z.string(),
+  healthCheckPath: z.string(),
+  tlsCertArn: z.string(),
+});
+
+const HpcConfigSchema = z.object({
+  scheduler: z.string(),
+  instanceType: z.string(),
+  nodeCount: z.number(),
+  maxNodes: z.number(),
+  sharedStorage: z.string(),
+  queue: z.string(),
+});
+
+const Ec2ResourceSchema = InfraBaseSchema.extend({
+  resourceType: z.literal("ec2"),
+  config: Ec2ConfigSchema,
+});
+
+const LambdaResourceSchema = InfraBaseSchema.extend({
+  resourceType: z.literal("lambda"),
+  config: LambdaConfigSchema,
+});
+
+const EksResourceSchema = InfraBaseSchema.extend({
+  resourceType: z.literal("eks"),
+  config: EksConfigSchema,
+});
+
+const VpcResourceSchema = InfraBaseSchema.extend({
+  resourceType: z.literal("vpc"),
+  config: VpcConfigSchema,
+});
+
+const S3ResourceSchema = InfraBaseSchema.extend({
+  resourceType: z.literal("s3"),
+  config: S3ConfigSchema,
+});
+
+const RdsResourceSchema = InfraBaseSchema.extend({
+  resourceType: z.literal("rds"),
+  config: RdsConfigSchema,
+});
+
+const LoadBalancerResourceSchema = InfraBaseSchema.extend({
+  resourceType: z.literal("load_balancer"),
+  config: LoadBalancerConfigSchema,
+});
+
+const HpcResourceSchema = InfraBaseSchema.extend({
+  resourceType: z.literal("hpc"),
+  config: HpcConfigSchema,
+});
+
+export const InfraBlockSchema = z.discriminatedUnion("resourceType", [
+  Ec2ResourceSchema,
+  LambdaResourceSchema,
+  EksResourceSchema,
+  VpcResourceSchema,
+  S3ResourceSchema,
+  RdsResourceSchema,
+  LoadBalancerResourceSchema,
+  HpcResourceSchema,
+]);
+
+// ============================================
 // API Binding (Full OpenAPI/AsyncAPI Features)
 // ============================================
 export const HttpMethodSchema = z.enum([
@@ -285,10 +445,11 @@ export const ApiBindingSchema = z.object({
 // ============================================
 // Node Data - Union of all kinds
 // ============================================
-export const NodeDataSchema = z.discriminatedUnion("kind", [
+export const NodeDataSchema = z.union([
   ProcessDefinitionSchema,
   DatabaseBlockSchema,
   QueueBlockSchema,
+  InfraBlockSchema,
   ApiBindingSchema,
 ]);
 
@@ -311,6 +472,10 @@ export type NodeData = z.infer<typeof NodeDataSchema>;
 export type ProcessDefinition = z.infer<typeof ProcessDefinitionSchema>;
 export type DatabaseBlock = z.infer<typeof DatabaseBlockSchema>;
 export type QueueBlock = z.infer<typeof QueueBlockSchema>;
+export type InfraBlock = z.infer<typeof InfraBlockSchema>;
+export type InfraResourceType = z.infer<typeof InfraResourceTypeSchema>;
+export type InfraProvider = z.infer<typeof InfraProviderSchema>;
+export type InfraEnvironment = z.infer<typeof InfraEnvironmentSchema>;
 export type ApiBinding = z.infer<typeof ApiBindingSchema>;
 export type InputField = z.infer<typeof InputFieldSchema>;
 export type OutputField = z.infer<typeof OutputFieldSchema>;

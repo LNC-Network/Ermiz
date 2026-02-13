@@ -20,6 +20,7 @@ import { ProcessNode } from "./nodes/ProcessNode";
 import { DatabaseNode } from "./nodes/DatabaseNode";
 import { QueueNode } from "./nodes/QueueNode";
 import { ApiBindingNode } from "./nodes/ApiBindingNode";
+import { InfraNode } from "./nodes/InfraNode";
 import { StepEdge } from "./edges/StepEdge";
 import { ContextMenu } from "./ContextMenu";
 
@@ -28,6 +29,7 @@ const nodeTypes: NodeTypes = {
   database: DatabaseNode as unknown as ComponentType<NodeProps>,
   queue: QueueNode as unknown as ComponentType<NodeProps>,
   api_binding: ApiBindingNode as unknown as ComponentType<NodeProps>,
+  infra: InfraNode as unknown as ComponentType<NodeProps>,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -276,6 +278,28 @@ function FlowCanvasInner() {
               if (node.data?.kind === "database") return "#336791";
               if (node.data?.kind === "queue") return "#facc15";
               if (node.data?.kind === "api_binding") return "#a78bfa";
+              if (node.data?.kind === "infra") {
+                switch (node.data?.resourceType) {
+                  case "ec2":
+                    return "#60a5fa";
+                  case "lambda":
+                    return "#facc15";
+                  case "eks":
+                    return "#34d399";
+                  case "vpc":
+                    return "#a78bfa";
+                  case "s3":
+                    return "#f97316";
+                  case "rds":
+                    return "#3b82f6";
+                  case "load_balancer":
+                    return "#22d3ee";
+                  case "hpc":
+                    return "#f472b6";
+                  default:
+                    return "#7c6cff";
+                }
+              }
               return "#7c6cff";
             }}
           />
