@@ -59,6 +59,7 @@ function Workspace({
   >({});
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const [leftSidebarWidth, setLeftSidebarWidth] = useState(DEFAULT_LEFT_WIDTH);
   const [inspectorWidth, setInspectorWidth] = useState(DEFAULT_INSPECTOR_WIDTH);
   const resizeStateRef = useRef<{
@@ -81,6 +82,11 @@ function Workspace({
     gap: 8,
     border: "1px solid transparent",
   };
+  const sidebarWidth = isNarrowViewport
+    ? "min(92vw, 360px)"
+    : leftSidebarWidth;
+  const sidebarGridColumns =
+    isNarrowViewport || leftSidebarWidth < 300 ? "1fr" : "1fr 1fr";
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -88,8 +94,9 @@ function Workspace({
       const rightCollapsed = localStorage.getItem(STORAGE_KEYS.rightSidebarCollapsed) === "1";
       const leftWidth = Number(localStorage.getItem(STORAGE_KEYS.leftSidebarWidth));
       const inspectorStored = Number(localStorage.getItem(STORAGE_KEYS.inspectorWidth));
-      setIsLeftSidebarCollapsed(leftCollapsed);
-      setIsInspectorCollapsed(rightCollapsed);
+      const isNarrow = window.matchMedia("(max-width: 1024px)").matches;
+      setIsLeftSidebarCollapsed(isNarrow ? true : leftCollapsed);
+      setIsInspectorCollapsed(isNarrow ? true : rightCollapsed);
       setLeftSidebarWidth(Math.max(200, Math.min(420, leftWidth || DEFAULT_LEFT_WIDTH)));
       setInspectorWidth(Math.max(260, Math.min(520, inspectorStored || DEFAULT_INSPECTOR_WIDTH)));
     }
@@ -116,6 +123,20 @@ function Workspace({
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(max-width: 1024px)");
+    const updateViewport = (event?: MediaQueryListEvent) => {
+      const isNarrow = event ? event.matches : mediaQuery.matches;
+      setIsNarrowViewport(isNarrow);
+    };
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+    return () => {
+      mediaQuery.removeEventListener("change", updateViewport);
     };
   }, []);
 
@@ -172,7 +193,85 @@ function Workspace({
   }, []);
 
   return (
-    <>
+    <div style={{ display: "flex", flex: 1, overflow: "hidden", position: "relative" }}>
+      {isNarrowViewport && (!isLeftSidebarCollapsed || !isInspectorCollapsed) && (
+        <button
+          type="button"
+          aria-label="Close open panel"
+          onClick={() => {
+            setIsLeftSidebarCollapsed(true);
+            setIsInspectorCollapsed(true);
+          }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            border: "none",
+            margin: 0,
+            padding: 0,
+            background: "rgba(8, 12, 18, 0.48)",
+            zIndex: 24,
+            cursor: "pointer",
+          }}
+        />
+      )}
+
+      {isNarrowViewport && (
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 10,
+            right: 10,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 8,
+            zIndex: 26,
+            pointerEvents: "none",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setIsLeftSidebarCollapsed((prev) => !prev);
+              setIsInspectorCollapsed(true);
+            }}
+            style={{
+              border: "1px solid var(--border)",
+              background: "var(--floating)",
+              color: "var(--foreground)",
+              borderRadius: 8,
+              padding: "6px 10px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              pointerEvents: "auto",
+            }}
+          >
+            {isLeftSidebarCollapsed ? "Open library" : "Close library"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsInspectorCollapsed((prev) => !prev);
+              setIsLeftSidebarCollapsed(true);
+            }}
+            style={{
+              border: "1px solid var(--border)",
+              background: "var(--floating)",
+              color: "var(--foreground)",
+              borderRadius: 8,
+              padding: "6px 10px",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              pointerEvents: "auto",
+            }}
+          >
+            {isInspectorCollapsed ? "Open inspector" : "Close inspector"}
+          </button>
+        </div>
+      )}
+
       {isLeftSidebarCollapsed ? (
         <button
           type="button"
@@ -185,7 +284,7 @@ function Workspace({
             background: "color-mix(in srgb, var(--panel) 92%, #0b0f16 8%)",
             color: "var(--muted)",
             cursor: "pointer",
-            display: "flex",
+            display: isNarrowViewport ? "none" : "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -193,7 +292,16 @@ function Workspace({
           ›
         </button>
       ) : (
-        <div style={{ position: "relative", display: "flex", zIndex: 20 }}>
+        <div
+          style={{
+            position: isNarrowViewport ? "absolute" : "relative",
+            top: isNarrowViewport ? 0 : undefined,
+            left: 0,
+            bottom: isNarrowViewport ? 0 : undefined,
+            display: "flex",
+            zIndex: isNarrowViewport ? 26 : 20,
+          }}
+        >
           <button
             type="button"
             onClick={() => setIsLeftSidebarCollapsed(true)}
@@ -201,7 +309,7 @@ function Workspace({
             style={{
               position: "absolute",
               top: "50%",
-              right: -12,
+              right: isNarrowViewport ? 8 : -12,
               transform: "translateY(-50%)",
               zIndex: 30,
               border: "1px solid var(--border)",
@@ -219,18 +327,23 @@ function Workspace({
 
           <aside
             style={{
-              width: leftSidebarWidth,
+              width: sidebarWidth,
               flexShrink: 0,
               height: "100%",
               minHeight: 0,
               borderRight: "1px solid var(--border)",
               background: "color-mix(in srgb, var(--panel) 92%, #0b0f16 8%)",
-              padding: 12,
+              paddingTop: isNarrowViewport ? 52 : 12,
+              paddingRight: 12,
+              paddingBottom: 16,
+              paddingLeft: 12,
               display: "flex",
               flexDirection: "column",
               gap: 12,
               overflowY: "auto",
               overflowX: "hidden",
+              overscrollBehaviorY: "contain",
+              WebkitOverflowScrolling: "touch",
             }}
           >
             {sections.map((section) => (
@@ -285,13 +398,21 @@ function Workspace({
                   </span>
                 </div>
                 {!collapsedSections[section.id] && (
-                  <div style={{ padding: 8, display: "grid", gap: 6 }}>
+                  <div
+                    style={{
+                      padding: 8,
+                      display: "grid",
+                      gap: 6,
+                      gridTemplateColumns: sidebarGridColumns,
+                    }}
+                  >
                     {section.items.map((item, index) => (
                       <div
                         key={`${section.id}-${item.kind}-${item.label}-${index}`}
                         style={{
                           ...sidebarItemStyle,
                           color: section.muted ? "var(--muted)" : "var(--secondary)",
+                          minWidth: 0,
                         }}
                         onClick={() => addNode(item.kind)}
                         onMouseOver={(e) => {
@@ -321,12 +442,24 @@ function Workspace({
                               fontSize: 12,
                               fontFamily: item.mono ? "monospace" : "inherit",
                               lineHeight: 1.2,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
                           >
                             {item.label}
                           </span>
                           {item.hint && (
-                            <span style={{ fontSize: 10, color: "var(--muted)" }}>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: "var(--muted)",
+                                display: isNarrowViewport ? "none" : "block",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
                               {item.hint}
                             </span>
                           )}
@@ -356,6 +489,7 @@ function Workspace({
             flexShrink: 0,
             background: "transparent",
             borderRight: "1px solid color-mix(in srgb, var(--border) 70%, transparent)",
+            display: isNarrowViewport ? "none" : "block",
           }}
         />
       )}
@@ -365,6 +499,7 @@ function Workspace({
           flex: 1,
           position: "relative",
           background: "var(--background)",
+          minWidth: 0,
         }}
       >
         <FlowCanvas />
@@ -382,7 +517,7 @@ function Workspace({
             background: "color-mix(in srgb, var(--panel) 92%, #0b0f16 8%)",
             color: "var(--muted)",
             cursor: "pointer",
-            display: "flex",
+            display: isNarrowViewport ? "none" : "flex",
             alignItems: "center",
             justifyContent: "center",
           }}
@@ -390,7 +525,16 @@ function Workspace({
           ‹
         </button>
       ) : (
-        <div style={{ position: "relative", display: "flex" }}>
+        <div
+          style={{
+            position: isNarrowViewport ? "absolute" : "relative",
+            top: isNarrowViewport ? 0 : undefined,
+            right: 0,
+            bottom: isNarrowViewport ? 0 : undefined,
+            display: "flex",
+            zIndex: isNarrowViewport ? 26 : undefined,
+          }}
+        >
           <div
             onMouseDown={(event) => {
               resizeStateRef.current = {
@@ -405,6 +549,7 @@ function Workspace({
               flexShrink: 0,
               background: "transparent",
               borderLeft: "1px solid color-mix(in srgb, var(--border) 70%, transparent)",
+              display: isNarrowViewport ? "none" : "block",
             }}
           />
           <button
@@ -414,7 +559,7 @@ function Workspace({
             style={{
               position: "absolute",
               top: "50%",
-              left: -12,
+              left: isNarrowViewport ? 8 : -12,
               transform: "translateY(-50%)",
               zIndex: 2,
               border: "1px solid var(--border)",
@@ -429,10 +574,12 @@ function Workspace({
           >
             ›
           </button>
-          <PropertyInspector width={inspectorWidth} />
+          <PropertyInspector
+            width={isNarrowViewport ? Math.min(inspectorWidth, 360) : inspectorWidth}
+          />
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -1461,6 +1608,7 @@ export default function Home() {
   const [resetLayoutSignal, setResetLayoutSignal] = useState(0);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isCompactViewport, setIsCompactViewport] = useState(false);
   const [commitStatus, setCommitStatus] = useState("Uncommitted changes");
   const [saveState, setSaveState] = useState("Unsaved");
   const profileRef = useRef<HTMLDivElement | null>(null);
@@ -1848,6 +1996,20 @@ export default function Home() {
   }, [activeTab]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(max-width: 1100px)");
+    const updateViewport = (event?: MediaQueryListEvent) => {
+      const isCompact = event ? event.matches : mediaQuery.matches;
+      setIsCompactViewport(isCompact);
+    };
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+    return () => {
+      mediaQuery.removeEventListener("change", updateViewport);
+    };
+  }, []);
+
+  useEffect(() => {
     setActiveWorkspaceTab(activeTab);
   }, [activeTab, setActiveWorkspaceTab]);
 
@@ -1935,25 +2097,35 @@ export default function Home() {
       <header
         style={{
           display: "flex",
-          height: 48,
-          alignItems: "center",
+          minHeight: 48,
+          alignItems: isCompactViewport ? "stretch" : "center",
           justifyContent: "space-between",
+          flexWrap: isCompactViewport ? "wrap" : "nowrap",
           borderBottom: "1px solid var(--border)",
           background: "color-mix(in srgb, var(--panel) 94%, #0c111a 6%)",
-          padding: "0 18px",
+          padding: isCompactViewport ? "8px 10px" : "0 18px",
           flexShrink: 0,
-          gap: 12,
+          gap: isCompactViewport ? 8 : 12,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: isCompactViewport ? 8 : 14,
+            minWidth: 0,
+            flex: 1,
+          }}
+        >
           <div
           style={{
             fontFamily: "var(--font-poetic)",
             fontWeight: 700,
-            fontSize: 26,
+            fontSize: isCompactViewport ? 20 : 26,
             letterSpacing: "0.025em",
             lineHeight: 1,
             color: "color-mix(in srgb, var(--foreground) 94%, #ffffff 6%)",
+            whiteSpace: "nowrap",
           }}
         >
           Ermiz Studio
@@ -1963,9 +2135,11 @@ export default function Home() {
               display: "flex",
               alignItems: "center",
               gap: 6,
-              marginLeft: 80,
+              marginLeft: isCompactViewport ? 0 : 80,
               borderRadius: 12,
               padding: 4,
+              overflowX: "auto",
+              minWidth: 0,
             }}
           >
             {(Object.keys(tabLabel) as WorkspaceTab[]).map((tab) => (
@@ -2003,58 +2177,65 @@ export default function Home() {
             position: "relative",
             display: "flex",
             alignItems: "center",
-            gap: 10,
+            gap: isCompactViewport ? 6 : 10,
+            marginLeft: isCompactViewport ? "auto" : 0,
           }}
         >
-          <button
-            type="button"
-            onClick={handleSaveChanges}
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--floating)",
-              color: "var(--foreground)",
-              borderRadius: 8,
-              padding: "6px 10px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Save Changes
-          </button>
-          <button
-            type="button"
-            onClick={handleCommitChanges}
-            style={{
-              border: "1px solid var(--border)",
-              background: "color-mix(in srgb, var(--primary) 20%, var(--panel) 80%)",
-              color: "var(--foreground)",
-              borderRadius: 8,
-              padding: "6px 10px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Commit
-          </button>
-          <button
-            type="button"
-            onClick={handleResetLayout}
-            title="Reset panel layout (Ctrl/Cmd+0)"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--floating)",
-              color: "var(--foreground)",
-              borderRadius: 8,
-              padding: "6px 10px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Reset Layout
-          </button>
+          {!isCompactViewport && (
+            <button
+              type="button"
+              onClick={handleSaveChanges}
+              style={{
+                border: "1px solid var(--border)",
+                background: "var(--floating)",
+                color: "var(--foreground)",
+                borderRadius: 8,
+                padding: "6px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Save Changes
+            </button>
+          )}
+          {!isCompactViewport && (
+            <button
+              type="button"
+              onClick={handleCommitChanges}
+              style={{
+                border: "1px solid var(--border)",
+                background: "color-mix(in srgb, var(--primary) 20%, var(--panel) 80%)",
+                color: "var(--foreground)",
+                borderRadius: 8,
+                padding: "6px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Commit
+            </button>
+          )}
+          {!isCompactViewport && (
+            <button
+              type="button"
+              onClick={handleResetLayout}
+              title="Reset panel layout (Ctrl/Cmd+0)"
+              style={{
+                border: "1px solid var(--border)",
+                background: "var(--floating)",
+                color: "var(--foreground)",
+                borderRadius: 8,
+                padding: "6px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Reset Layout
+            </button>
+          )}
           {user ? (
             <button
               type="button"
@@ -2370,20 +2551,22 @@ export default function Home() {
       {/* Bottom Status Bar */}
       <footer
         style={{
-          height: 28,
+          minHeight: isCompactViewport ? 30 : 28,
           flexShrink: 0,
           background: "color-mix(in srgb, var(--panel) 94%, #0c111a 6%)",
           borderTop: "1px solid var(--border)",
           display: "flex",
           alignItems: "center",
-          padding: "0 16px",
+          padding: isCompactViewport ? "4px 10px" : "0 16px",
           fontSize: 11,
           color: "var(--muted)",
           justifyContent: "space-between",
           gap: 12,
         }}
       >
-        <div>{statusText}</div>
+        <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {statusText}
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span
             style={{
@@ -2395,26 +2578,30 @@ export default function Home() {
           >
             Credits Used: {creditUsedPercent}%
           </span>
-          <span
-            style={{
-              border: "1px solid var(--border)",
-              borderRadius: 999,
-              padding: "2px 8px",
-              color: "var(--secondary)",
-            }}
-          >
-            Save: {saveState}
-          </span>
-          <span
-            style={{
-              border: "1px solid var(--border)",
-              borderRadius: 999,
-              padding: "2px 8px",
-              color: "var(--secondary)",
-            }}
-          >
-            Commit: {commitStatus}
-          </span>
+          {!isCompactViewport && (
+            <span
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 999,
+                padding: "2px 8px",
+                color: "var(--secondary)",
+              }}
+            >
+              Save: {saveState}
+            </span>
+          )}
+          {!isCompactViewport && (
+            <span
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: 999,
+                padding: "2px 8px",
+                color: "var(--secondary)",
+              }}
+            >
+              Commit: {commitStatus}
+            </span>
+          )}
         </div>
       </footer>
     </div>
